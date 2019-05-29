@@ -52,3 +52,4 @@ CATKIN_IGNORE
 
 **/.DS_Store
 **/.catkin_tools
+**/tex-output

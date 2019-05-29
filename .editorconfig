@@ -1,0 +1,10 @@
+root = true
+
+[*.{json,tex}]
+indent_size = 2
+
+[*.{cpp,c,h,hpp,cxx,hxx,hh,cc}]
+indent_size = 4
+
+[*]
+indent_style = space

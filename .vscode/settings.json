@@ -1,0 +1,59 @@
+{
+  "latex-workshop.latex.tools": [
+    {
+      "name": "latexmk",
+      "command": "latexmk",
+      "args": [
+        "-synctex=1",
+        "-interaction=nonstopmode",
+        "-file-line-error",
+        "-pdf",
+        "-output-directory=%DIR%/tex-output",
+        "%DOC%"
+      ]
+    },
+    {
+      "name": "pdflatex",
+      "command": "pdflatex",
+      "args": [
+        "-synctex=1",
+        "-interaction=nonstopmode",
+        "-file-line-error",
+        "-output-directory=%DIR%/tex-output",
+        "%DOC%"
+      ]
+    },
+    {
+      "name": "bibtex",
+      "command": "bibtex",
+      "args": [
+          "%DOCFILE%"
+      ]
+    }
+  ],
+  "latex-workshop.latex.outDir": "%DIR%/tex-output",
+  "latex-workshop.latex.autoBuild.run": "onFileChange",
+  "latex-workshop.latex.watch.files.ignore": [
+    "**/*.bbx",
+    "**/*.bbl",
+    "**/*.cbx",
+    "**/*.cfg",
+    "**/*.clo",
+    "**/*.cnf",
+    "**/*.def",
+    "**/*.fmt",
+    "**/*.lbx",
+    "**/*.map",
+    "**/*.pfb",
+    "**/*.tfm",
+    "**/texmf-{dist,var}/**",
+    "/dev/null"
+  ],
+  "cSpell.words": [
+    "Swarmathon",
+    "Swarmie",
+    "Robo",
+    "swarmies",
+    "Kalman"
+  ]
+}
