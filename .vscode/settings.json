@@ -55,5 +55,6 @@
     "Robo",
     "swarmies",
     "Kalman"
-  ]
+  ],
+  "editor.wordWrap": "wordWrapColumn"
 }

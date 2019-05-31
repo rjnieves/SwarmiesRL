@@ -43,7 +43,9 @@
     </concept>
     <concept>
       <concept_id>10010147.10010257.10010258.10010261.10010275</concept_id>
-      <concept_desc>Computing methodologies~Multi-agent reinforcement learning</concept_desc>
+      <concept_desc>
+        Computing methodologies~Multi-agent reinforcement learning
+      </concept_desc>
       <concept_significance>500</concept_significance>
     </concept>
   </ccs2012>
@@ -88,6 +90,13 @@ a clear path to implementation into physical robots participating in live
 competition.
 
 \section{Problem Domain}\label{sec:prob_domain}
+In a generic sense, NASA Swarmathon is a resource gathering exercise using a
+swarm of autonomous robots. The robotic swarm is expected to gather a set of
+resources from their surrounding environment onto a collection area without
+relying on any human supervision. NASA's intent with the competition is the
+development of technologies that could one day be used to deploy ``advance
+missions'' that perform as much preparation as possible at a planetary body site ahead of the arrival by human explorers.
+
 NASA defines the Swarmathon competition environment using the following
 elements:
 
@@ -97,8 +106,8 @@ elements:
   competition is at.
   \item A swarm of three or six robots, with each robot labeled as a
   ``swarmie.''
-  \item Up to 256, $2 \times 2 \times 2$ inch cubes bearing ``April Tag'' markers
-  on all six faces, known as ``April Cubes.''
+  \item Up to 256, $2 \times 2 \times 2$ inch cubes bearing ``April Tag''
+  markers on all six faces, known as ``April Cubes.''
   \item A $1 \times 1$ meter square collection area within the competition
   field, known as a ``nest.''
 \end{itemize}
@@ -114,7 +123,12 @@ overall score.
 Team members are not allowed contact or communication with the robots
 (``swarmies'') during a round, leaving the robots to complete the task
 leveraging their built-in sensor package and logic deployed to them prior to the
-round. The elements that comprise the ``swarmie'' sensor package include the
+round. Individual robots are, however, allowed to communicate amongst
+themselves. Although no restrictions on underlying physical communication fabric
+exists as of this writing, the selected physical fabric must be exposed to the
+robots via the ROS Publish-Subscribe communication system. A popular choice among teams is the use of Wi-Fi networking to implement robot-to-robot communication. No restrictions regarding bandwidth or reliability is imposed on the teams as of this writing.
+
+The elements that comprise the ``swarmie'' sensor package include the
 following:
 
 \begin{itemize}
@@ -158,12 +172,12 @@ periphery where the robots must deposit the cubes.
 
 The NASA baseline software is written in terms of the facilities and services
 provided by ROS, particularly when it comes to communication. Software provided
-by teams must run within ROS and only utilize the Publish-Subscribe system
-provided with ROS for their communication needs. In addition, the NASA baseline
-software provides a simulation environment that combines ROS Gazebo with 3D
-models of the robots and sensor emulation. During a simulation session, the
-communication traffic fed as input to the software components that combine to
-implement a robot's logic is practically indistinguishable from traffic that
+by teams must run within ROS and, again, may only utilize the Publish-Subscribe
+system provided with ROS for their communication needs. In addition, the NASA
+baseline software provides a simulation environment that combines ROS Gazebo
+with 3D models of the robots and sensor emulation. During a simulation session,
+the communication traffic fed as input to the software components that combine
+to implement a robot's logic is practically indistinguishable from traffic that
 would be produced by the sensor package of a physical robot.
 
 \section{Related Works}\label{sec:related_works}
