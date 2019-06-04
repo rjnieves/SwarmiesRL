@@ -1,6 +1,6 @@
 root = true
 
-[*.{json,tex}]
+[*.{json,tex,py}]
 indent_size = 2
 
 [*.{cpp,c,h,hpp,cxx,hxx,hh,cc}]

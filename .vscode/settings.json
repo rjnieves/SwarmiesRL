@@ -56,5 +56,15 @@
     "swarmies",
     "Kalman"
   ],
-  "editor.wordWrap": "wordWrapColumn"
+  "editor.wordWrap": "wordWrapColumn",
+  "cmake.configureOnOpen": false,
+  "clangd.arguments": [
+    "-compile-commands-dir=${workspaceRoot}/build"
+  ],
+  "cmake.buildDirectory": "${workspaceRoot}/build",
+  "files.watcherExclude": {
+    "**/build": true,
+    "**/.catkin_tools": true,
+    "**/logs": true
+  }
 }
