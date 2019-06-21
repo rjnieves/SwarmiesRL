@@ -15,13 +15,15 @@
 #include <ros/ros.h>
 
 #include "NodeConfiguration.hh"
-#include "SystemStateSample.hh"
+#include "SystemStateRepository.hh"
 
 using std::cout;
 using std::cerr;
 using std::endl;
 using std::stringstream;
 using std::exception;
+
+using ThreeRobotSystemState = SystemStateRepository< 3u >;
 
 int main(int argc, char const **argv)
 {
@@ -30,7 +32,7 @@ int main(int argc, char const **argv)
     try
     {
         NodeConfiguration nodeConfig;
-        SystemStateSample< 3u > aState;
+        ThreeRobotSystemState sysState {0.5, 16u};
 
         nodeConfig.addCommandLineConfig(argc, argv);
 
@@ -42,13 +44,36 @@ int main(int argc, char const **argv)
         {
             stringstream nodeName;
             nodeName << nodeConfig.robotName() << "_NEW_BEHAVIOR";
-            cout << "Current State:" << aState << endl;
-            double *stateVals = new double[aState.size()];
-            std::copy(aState.begin(), aState.end(), stateVals);
-            std::copy(stateVals, stateVals + aState.size(), std::ostream_iterator< double >(cout, " "));
-            cout << endl;
-            delete [] stateVals;
-            stateVals = nullptr;
+            cout << "Current State:" << sysState.currentState() << endl;
+            sysState.roverAtPos(0u, 0.0, 1.308);
+            sysState.roverAtPos(1u, -1.308, 0.0);
+            sysState.roverAtPos(2u, 0.0, -1.308);
+            cout << "Current State:" << sysState.currentState() << endl;
+            sysState.foundBlockAt(-3.0, -2.8);
+            sysState.roverAtPos(0u, 0.0, 1.308);
+            sysState.roverAtPos(1u, -1.308, 0.0);
+            sysState.roverAtPos(2u, 0.0, -1.308);
+            cout << "Current State:" << sysState.currentState() << endl;
+            sysState.roverAtPos(0u, 0.0, 1.308);
+            sysState.roverAtPos(1u, -1.308, 0.0);
+            sysState.roverAtPos(2u, -0.20, -1.308);
+            cout << "Current State:" << sysState.currentState() << endl;
+            sysState.roverAtPos(0u, 0.0, 1.308);
+            sysState.roverAtPos(1u, -1.308, 0.0);
+            sysState.roverAtPos(2u, -0.40, -1.308);
+            cout << "Current State:" << sysState.currentState() << endl;
+            sysState.roverAtPos(0u, 0.0, 1.308);
+            sysState.roverAtPos(1u, -1.308, 0.0);
+            sysState.roverAtPos(2u, -0.60, -1.308);
+            cout << "Current State:" << sysState.currentState() << endl;
+            sysState.roverAtPos(0u, 0.0, 1.308);
+            sysState.roverAtPos(1u, -1.308, 0.0);
+            sysState.roverAtPos(2u, -0.80, -1.308);
+            cout << "Current State:" << sysState.currentState() << endl;
+            sysState.roverAtPos(0u, 0.0, 1.308);
+            sysState.roverAtPos(1u, -1.308, 0.0);
+            sysState.roverAtPos(2u, -1.00, -1.308);
+            cout << "Current State:" << sysState.currentState() << endl;
 
             ros::init(argc, const_cast< char** >(argv), nodeName.str());
             ros::spin();

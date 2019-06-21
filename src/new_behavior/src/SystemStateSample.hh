@@ -31,7 +31,7 @@ private:
 
     StateStorage m_storage;
 
-    void validateRoverIndex(unsigned int roverIdx)
+    void validateRoverIndex(unsigned int roverIdx) const
     {
         if (roverIdx >= RoverCount)
         {
