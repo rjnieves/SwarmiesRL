@@ -10,10 +10,12 @@
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
+#include <algorithm>
 
 #include <ros/ros.h>
 
 #include "NodeConfiguration.hh"
+#include "SystemStateSample.hh"
 
 using std::cout;
 using std::cerr;
@@ -28,6 +30,7 @@ int main(int argc, char const **argv)
     try
     {
         NodeConfiguration nodeConfig;
+        SystemStateSample< 3u > aState;
 
         nodeConfig.addCommandLineConfig(argc, argv);
 
@@ -39,6 +42,13 @@ int main(int argc, char const **argv)
         {
             stringstream nodeName;
             nodeName << nodeConfig.robotName() << "_NEW_BEHAVIOR";
+            cout << "Current State:" << aState << endl;
+            double *stateVals = new double[aState.size()];
+            std::copy(aState.begin(), aState.end(), stateVals);
+            std::copy(stateVals, stateVals + aState.size(), std::ostream_iterator< double >(cout, " "));
+            cout << endl;
+            delete [] stateVals;
+            stateVals = nullptr;
 
             ros::init(argc, const_cast< char** >(argv), nodeName.str());
             ros::spin();
