@@ -54,7 +54,10 @@
     "Swarmie",
     "Robo",
     "swarmies",
-    "Kalman"
+    "Kalman",
+    "waypoint",
+    "waypoints",
+    "discretization"
   ],
   "cmake.configureOnOpen": false,
   "clangd.arguments": [
@@ -65,5 +68,6 @@
     "**/build": true,
     "**/.catkin_tools": true,
     "**/logs": true
-  }
+  },
+  "editor.wordWrap": "wordWrapColumn"
 }

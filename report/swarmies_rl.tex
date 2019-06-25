@@ -1,6 +1,7 @@
 \documentclass[sigconf,authordraft]{acmart}
 
 \usepackage{gensymb}
+\usepackage[inline]{enumitem}
 
 \AtBeginDocument{%
   \providecommand\BibTeX{{%
@@ -184,7 +185,57 @@ would be produced by the sensor package of a physical robot.
 Related works discussion.
 
 \section{Methodology}\label{sec:methodology}
-Methodology discussion.
+There are many aspects of the NASA Swarmathon domain that pose a challenge against the implementation of a Reinforcement Learning (RL) based solution. Chief among these challenges are:
+
+\begin{itemize}
+  \item Although the number of ``April Cubes'' the Swarmies are tasked with foraging is fixed and known, their exact location in the arena is not.
+  \item The Swarmies identify the location of ``April Cubes'' using two-dimensional cartesian coordinates $\textbf{L} \in \mathbb{R}^2$ based on the coordinate reference frame individually maintained by each Swarmie.
+  \item The Swarmies navigate the competition area primarily using waypoints that are specified as two-dimensional cartesian coordinates $\textbf{W} \in \mathbb{R}^2$, again based on the individual reference frame maintained by each Swarmie.
+  \item The Swarmies are not designed to properly map the competition area, thus they are required to continuously detect and properly react to the area's boundaries as well as the collection ``nest.''
+\end{itemize}
+
+Addressing each one of the aforementioned challenges is not impossible, but does impact the RL-based solution in ways that could introduce some margin of error and uncertainty.
+
+The lack of persistent mapping capability by the Swarmies is not too difficult a challenge, as both the robot's sensor package and competition area markings make it possible to navigate without having to resort to a map or known landmark locations. The baseline NASA Swarmathon software code contains low-level logic that enables
+\begin{enumerate*}[label={(\arabic*)}]
+  \item the detection and avoidance of physical obstacles,
+  \item the detection of the collection zone (i.e., the ``nest''), and
+  \item the detection and avoidance of the competition area boundary.
+\end{enumerate*}
+Thus, given that hazard avoidance is not the main focus of this RL-based solution, integrating the existing logic is the most efficient course of action to address the challenge.
+
+Considered in isolation, the requirement that the robotic swarm find the location of all the ``April Cubes'' with very little prior knowledge is not a very difficult problem. Indeed, such a problem closely resembles a run-of-the-mill mapping exercise. The complications begin to arise once the following facts are taken into consideration:
+
+\begin{itemize}
+  \item Each Swarmie calls out the location of each ``April Cube'' observed in the competition area using real-space coordinates based on the robot's individual reference frame.
+  \item The reference frame maintained by each Swarmie centers its origin at the robot's starting location.
+  \item Even with sensor fusion, the reported location by each Swarmie varies by as much as $\pm 0.5$ meters with each sensor reading.
+\end{itemize}
+
+The presence of multiple reference frames can be addressed via the use of a simple affine transform to a global reference frame. Given that, at the start of a simulated run, the location of each Swarmie is specified in such a global reference frame, the parameters for such a transform (which would only include a translation component) can be easily communicated to each robot.
+
+The use of real-space coordinates, combined with the variability introduced by the sensor package, makes it nearly impossible to properly attach a true location for an individual ``April Cube,'' even after applying a global reference frame transform. Although a system could be devised that could combine multiple observations with SLAM-like techniques to narrow the sensor variability, such is not the focus of this study.
+
+Instead, a more economical approach involves the discretization of the competition area, making it resemble a ``grid world,'' at least for the purposes of ``April Cube'' mapping. Given the perceived position variability, at least as produced by sensor fusion, a good starting point for a grid world cell size could be $0.5 \times 0.5$ meters square. Making the grid world cell size into a hyper-parameter of the model makes it possible to supplement the optimization options of the resulting system.
+
+Since in almost all cases the grid world cell size will be far larger than the surface area occupied by an individual ``April Cube,'' there exists a very good possibility that multiple cubes will occupy a particular cell. Thus, even after discretization, uniquely attaching a location for each cube remains elusive. However, given that the total number of cubes present is known to each robot, it is possible to indirectly attach a state label to the cubes present in the competition area. Consider that, at any one time, ``April Cube'' subsets could be incorporated into one of four mutually-exclusive states:
+
+\begin{description}
+  \item[At-Large]: Cubes that are known to exist, but whose location remains unknown.
+  \item[Located]: Cubes that are known to be occupying a cell in the competition area grid world, outside of the collection zone.
+  \item[In-Transit]: Cubes being transported by Swarmie robots to the collection zone.
+  \item[Collected]: Cubes known to be present in the collection zone.
+\end{description}
+
+Given that the subsets are mutually exclusive, a simple mathematical relation can be drawn from their individual membership sizes. Let $N$ be the total number of cubes known to exist, $B_u$ be the number cubes considered \textbf{At-Large}, $B_l$ be the number of cubes considered \textbf{Located}, $B_t$ be the number of cubes considered \textbf{In-Transit}, and $B_c$ be the number of cubes considered \textbf{Collected}. Equation \ref{eq:cube_count_relation} depicts the mathematical relation.
+
+\begin{equation}\label{eq:cube_count_relation}
+  N = B_u + B_l + B_t + B_c
+\end{equation}
+
+The count of ``April Cubes'' considered \textbf{In-Transit} or \textbf{Collected} is pretty self-explanatory. The count of cubes considered \textbf{Located} ($B_l$) is a little more nebulous. Given the conditions that led to the discretization of the competition area, not every individual cube spotted by a Swarmie robot will be immediately accounted for in $B_l$. A more apt description for the set would be the number of competition area grid cells known to be occupied by at least one ``April Cube.'' Thus, during most of the competition run, $B_l$ will under-estimate the number of cubes spotted by Swarmies. Fortunately, the combination of the known total cube count ($N$), Equation \ref{eq:cube_count_relation}, and the \textbf{At-Large} set size ($B_u$) help to ensure that any located cube under-count is eventually rectified. Once a grid world cell is considered ``unoccupied'' (e.g., due to a cube in the cell being picked up), the spotting of another cube in the same cell will transition a cube from \textbf{At-Large} to \textbf{Located} (i.e., bump $B_l$ at the expense of $B_u$). Such transitions help lift the ``fog of war'' that obfuscates the location of ``April Cubes,'' manifested by the $B_u$ term in Equation \ref{eq:cube_count_relation}.
+
+The set counts in Equation \ref{eq:cube_count_relation} serve as an excellent starting point for defining the state space that the Reinforcement Learning algorithm in this Swarmathon solution uses.
 
 \section{Experimental Results}\label{sec:results}
 Results discussion.
