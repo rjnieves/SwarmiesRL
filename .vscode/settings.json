@@ -57,7 +57,11 @@
     "Kalman",
     "waypoint",
     "waypoints",
-    "discretization"
+    "discretization",
+    "discretized",
+    "fetchable",
+    "stateful",
+    "subcomponent"
   ],
   "cmake.configureOnOpen": false,
   "clangd.arguments": [
