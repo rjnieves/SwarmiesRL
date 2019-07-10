@@ -82,7 +82,7 @@ Thus, the search for a ``better mouse trap'' in the area of cooperating,
 multi-agent RL has led to a proliferation of problem domains under which
 methodology performance can be tested and quantified. From grid-world like
 synthetic predator-prey scenarios, to more flexible environments like RoboCup
-Simulated Soccer, these domains offer efficient ways to test theories. One
+2D Simulated Soccer, these domains offer efficient ways to test theories. One
 shortcoming of these problem domains, however, is the difficulty of implementing
 any realized achievements into a physical domain.
 
@@ -184,7 +184,11 @@ to implement a robot's logic is practically indistinguishable from traffic that
 would be produced by the sensor package of a physical robot.
 
 \section{Related Works}\label{sec:related_works}
-Related works discussion.
+Related works notes:
+
+Found an interesting thesis discussing some alternatives to $\epsilon$-greedy exploration/exploitation techniques \cite[pp. 54]{nissen2007large}. The original intent was to find implementation hints for SARSA($\lambda$) but the aforementioned section could be applicable.
+
+Found what could be a good C++ library that provides an implementation of several reinforcement learning algorithms, including SARSA($\lambda$): \cite[RLLib]{samindaa-rllib}. One thing that is a concern is that it uses linear approximation instead of ANNs.
 
 \section{Methodology}\label{sec:methodology}
 
