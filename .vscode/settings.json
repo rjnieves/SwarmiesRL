@@ -75,5 +75,6 @@
     "**/.catkin_tools": true,
     "**/logs": true
   },
-  "editor.wordWrap": "wordWrapColumn"
+  "editor.wordWrap": "wordWrapColumn",
+  "python.pythonPath": "/home/rnieves/pythonenv/SWARMIES-RL/bin/python"
 }
