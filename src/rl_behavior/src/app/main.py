@@ -1,12 +1,18 @@
 from __future__ import print_function
 import math
+import numpy as np
 import rospy
 import message_filters
+import tf
+from tf import TransformListener
 from tf.transformations import euler_from_quaternion
 from std_msgs.msg import String, UInt8
 from geometry_msgs.msg import Pose2D
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import Range, Joy
+from apriltags_ros.msg import AprilTagDetectionArray
+from swarmie_msgs.msg import Skid
+from . import LocationInformation
 
 class RlBehavior(object):
   NAME_TO_ID_MAP = [
@@ -18,26 +24,34 @@ class RlBehavior(object):
   STATUS_PERIOD = rospy.Duration(1, 0)
   MANUAL_MODE = 1
   AUTONOMOUS_MODE = 2
+  MODE_DICT = {
+    MANUAL_MODE: {
+      'log_fmt': '{swarmie_name} switching to MANUAL_MODE',
+      'infolog_fmt': '{swarmie_name} under manual control',
+    },
+    AUTONOMOUS_MODE: {
+      'log_fmt': '{swarmie_name} switching to AUTONOMOUS_MODE',
+      'infolog_fmt': '{swarmie_name} operating autonomously',
+    }
+  }
   WARMUP_TIME = rospy.Duration(30, 0)
   TIMESTEP_PERIOD = rospy.Duration(0, 100000000)
   JOYSTICK_LINEAR_AXIS = 4
-  JOYSTICK_ANGUAR_AXIS = 3
+  JOYSTICK_ANGULAR_AXIS = 3
+  MAX_MOTOR_CMD = 255.0
+  INIT_PLACE_RADIUS = 1.3
 
   def __init__(self, swarmie_name):
     self.swarmie_name = swarmie_name
     self.swarmie_id = RlBehavior.NAME_TO_ID_MAP.index(swarmie_name)
-    self.center_location = {
-      'map': None,
-      'odom': None
-    }
-    self.current_location = {
-      'map': None,
-      'odom': None
-    }
+    self.location_info = LocationInformation()
+    self.mode = RlBehavior.MANUAL_MODE
+    self.tf = None
     # Publishers ---------------------------------------------------------------
     self.status_pub = None
     self.hb_pub = None
     self.infolog_pub = None
+    self.drive_cmd_pub = None
     # Timers -------------------------------------------------------------------
     self.status_timer = None
     self.timestep_timer = None
@@ -51,10 +65,12 @@ class RlBehavior(object):
     self.sonar_right_sub = None
     self.sonar_sync = None
     self.joy_sub = None
+    self.target_sub = None
   
   def run(self):
     print('Welcome to the world of tomorrow {}!'.format(self.swarmie_name))
     rospy.init_node('{}_BEHAVIOUR'.format(self.swarmie_name))
+    self.tf = TransformListener()
     # --------------------------------------------------------------------------
     # Set up all the publishers
     #
@@ -72,6 +88,11 @@ class RlBehavior(object):
       '/infoLog',
       String,
       queue_size=1
+    )
+    self.drive_cmd_pub = rospy.Publisher(
+      '{}/driveControl'.format(self.swarmie_name),
+      Skid,
+      queue_size=10
     )
     # --------------------------------------------------------------------------
     # Set up all the subscribers
@@ -117,6 +138,12 @@ class RlBehavior(object):
       callback=self._on_joy_cmd,
       queue_size=10
     )
+    self.target_sub = rospy.Subscriber(
+      '/{}/targets'.format(self.swarmie_name),
+      AprilTagDetectionArray,
+      callback=self._on_tags_spotted,
+      queue_size=10
+    )
     # --------------------------------------------------------------------------
     # Set up all the timers
     #
@@ -136,10 +163,7 @@ class RlBehavior(object):
   
   @property
   def initialized(self):
-    return (
-      self.center_location['map'] is not None and
-      self.center_location['odom'] is not None
-    )
+    return self.location_info.ready
 
   def _on_hb_timer(self, event):
     hb_msg = String()
@@ -161,40 +185,17 @@ class RlBehavior(object):
 
   def _on_timestep_timer(self, event):
     if not self.initialized:
-      # First time initialization
       self.infolog_pub.publish(
         String(
-          data='{} ready to learn!'.format(self.swarmie_name)
+          data='{} willing to learn!'.format(self.swarmie_name)
         )
       )
-      self.center_location['odom'] = Pose2D(
-        x=1.3 * math.cos(self.current_location['odom'].theta),
-        y=1.3 * math.sin(self.current_location['odom'].theta)
-      )
+      self.location_info.initialize_centers(RlBehavior.INIT_PLACE_RADIUS)
       rospy.loginfo(
-        '{} odom center at ({},{}), current yaw ({})'.format(
+        '{} perceived center in odom frame at ({},{})'.format(
           self.swarmie_name,
-          self.center_location['odom'].x,
-          self.center_location['odom'].y,
-          self.current_location['odom'].theta
-        )
-      )
-      self.center_location['map'] = Pose2D(
-        x=(
-          self.current_location['map'].x +
-          (1.3 * math.cos(self.current_location['map'].theta))
-        ),
-        y=(
-          self.current_location['map'].y +
-          (1.3 * math.sin(self.current_location['map'].theta))
-        )
-      )
-      rospy.loginfo(
-        '{} map center at({},{}), current map yaw ({})'.format(
-          self.swarmie_name,
-          self.center_location['map'].x,
-          self.center_location['map'].y,
-          self.current_location['map'].theta
+          self.location_info.odom_center[0],
+          self.location_info.odom_center[1]
         )
       )
 
@@ -208,13 +209,6 @@ class RlBehavior(object):
     :param sample: Sample containing position information.
     :type sample: nav_msgs.msg.Odometry
     """
-    rospy.logdebug(
-      '{} local position: ({},{})'.format(
-        self.swarmie_name,
-        sample.pose.pose.position.x,
-        sample.pose.pose.position.y
-      )
-    )
     (_, _, yaw) = euler_from_quaternion(
       (
         sample.pose.pose.orientation.x,
@@ -223,10 +217,12 @@ class RlBehavior(object):
         sample.pose.pose.orientation.w
       )
     )
-    self.current_location['odom'] = Pose2D(
-      x=sample.pose.pose.position.x,
-      y=sample.pose.pose.position.y,
-      theta=yaw
+    self.location_info.odom_current = np.array(
+      [
+        sample.pose.pose.position.x,
+        sample.pose.pose.position.y,
+        yaw
+      ]
     )
 
   def _on_map_update(self, sample):
@@ -239,13 +235,6 @@ class RlBehavior(object):
     :param sample: Odometry sample.
     :type sample: nav_msgs.msg.Odometry
     """
-    rospy.logdebug(
-      '{} map position: ({},{})'.format(
-        self.swarmie_name,
-        sample.pose.pose.position.x,
-        sample.pose.pose.position.y
-      )
-    )
     (_, _, yaw) = euler_from_quaternion(
       (
         sample.pose.pose.orientation.x,
@@ -254,10 +243,12 @@ class RlBehavior(object):
         sample.pose.pose.orientation.w
       )
     )
-    self.current_location['map'] = Pose2D(
-      x=sample.pose.pose.position.x,
-      y=sample.pose.pose.position.y,
-      theta=yaw
+    self.location_info.map_current = np.array(
+      [
+        sample.pose.pose.position.x,
+        sample.pose.pose.position.y,
+        yaw
+      ]
     )
 
   def _on_mode_change(self, sample):
@@ -269,31 +260,23 @@ class RlBehavior(object):
     :param sample: UInt8 sample containing the new mode.
     :type sample: std_msgs.msg.UInt8
     """
-    if sample.data == RlBehavior.AUTONOMOUS_MODE:
-      rospy.loginfo(
-        '{} switching to AUTONOMOUS_MODE'.format(self.swarmie_name)
-      )
-      self.infolog_pub.publish(
-        String(
-          data='{} operating autonomously'.format(self.swarmie_name)
+    if sample.data != self.mode:
+      if sample.data in RlBehavior.MODE_DICT:
+        self.mode = sample.data
+        dict_entry = RlBehavior.MODE_DICT[sample.data]
+        rospy.loginfo(
+          dict_entry['log_fmt'].format(swarmie_name=self.swarmie_name)
         )
-      )
-    elif sample.data == RlBehavior.MANUAL_MODE:
-      rospy.loginfo(
-        '{} switching to MANUAL_MODE'.format(self.swarmie_name)
-      )
-      self.infolog_pub.publish(
-        String(
-          data='{} under manual control'.format(self.swarmie_name)
+        self.infolog_pub.publish(
+          dict_entry['infolog_fmt'].format(swarmie_name=self.swarmie_name)
         )
-      )
-    else:
-      rospy.logwarn(
-        '{} cannot switch to unknown mode {}'.format(
-          self.swarmie_name,
-          sample.data
+      else:
+        rospy.logwarn(
+          '{} cannot switch to unknown mode {}'.format(
+            self.swarmie_name,
+            sample.data
+          )
         )
-      )
 
   def _on_sonar_update(self, left_sample, center_sample, right_sample):
     """Sonar data update callback.
@@ -325,17 +308,85 @@ class RlBehavior(object):
     :param cmd: Joystick command sample.
     :type cmd: sensor_msgs.msg.Joy
     """
-    rospy.loginfo(
-      '{} joystick linear command speed={}'.format(
-        self.swarmie_name,
+    if self.mode == RlBehavior.MANUAL_MODE:
+      # ------------------------------------------------------------------------
+      # Scale linear motor command, enforcing a +/- 0.1 "dead zone"
+      linear_thresh = math.fabs(
         cmd.axes[RlBehavior.JOYSTICK_LINEAR_AXIS]
+      ) >= 0.1
+      linear_cmd = (
+        cmd.axes[RlBehavior.JOYSTICK_LINEAR_AXIS] *
+        RlBehavior.MAX_MOTOR_CMD
       )
-    )
-    rospy.loginfo(
-      '{} joystick angular command speed={}'.format(
-        self.swarmie_name,
-        cmd.axes[RlBehavior.JOYSTICK_ANGUAR_AXIS]
+      linear_cmd = 0.0 if not linear_thresh else linear_cmd
+      # ------------------------------------------------------------------------
+      # Scale angular motor command, enforcing a +/- 0.1 "dead zone"
+      angular_thresh = math.fabs(
+        cmd.axes[RlBehavior.JOYSTICK_ANGULAR_AXIS]
+      ) >= 0.1
+      angular_cmd = (
+        cmd.axes[RlBehavior.JOYSTICK_ANGULAR_AXIS] *
+        RlBehavior.MAX_MOTOR_CMD
       )
-    )
+      angular_cmd = 0.0 if not angular_thresh else angular_cmd
+      # ------------------------------------------------------------------------
+      # Calculate left robot tracks command, restricting the command value to
+      # the range [-MAX_MOTOR_CMD, MAX_MOTOR_CMD]
+      left_cmd = linear_cmd - angular_cmd
+      left_cmd = min(left_cmd, RlBehavior.MAX_MOTOR_CMD)
+      left_cmd = max(left_cmd, -1.0 * RlBehavior.MAX_MOTOR_CMD)
+      # ------------------------------------------------------------------------
+      # Calculate right robot tracks command, restricting the command value to
+      # the range [-MAX_MOTOR_CMD, MAX_MOTOR_CMD]
+      right_cmd = linear_cmd + angular_cmd
+      right_cmd = min(right_cmd, RlBehavior.MAX_MOTOR_CMD)
+      right_cmd = max(right_cmd, -1.0 * RlBehavior.MAX_MOTOR_CMD)
+      self.drive_cmd_pub.publish(
+        Skid(left=left_cmd, right=right_cmd)
+      )
+
+  def _on_tags_spotted(self, tag_list):
+    """April tag detection callback.
+
+    Called by ROS whenever the April tag CV task spots tags in images returned
+    by the swarmie camera.
+
+    :param tag_list: List of April tags spotted by CV algorithm.
+    :type tag_list: apriltags_ros.msg.AprilTagDetectionArray
+    """
+    if not self.initialized:
+      return
+    for a_tag_detect in tag_list.detections:
+      if a_tag_detect.id == 0:
+        target_frame = ''
+        resulting_pose = a_tag_detect.pose
+        cube_best_guess = None
+        try:
+          for target_id in ['base_link', 'odom',]:
+            target_frame = '{swarmie}/{target}'.format(
+              swarmie=self.swarmie_name,
+              target=target_id
+            )
+            self.tf.waitForTransform(
+              target_frame,
+              resulting_pose.header.frame_id,
+              resulting_pose.header.stamp,
+              rospy.Duration(nsecs=100000000)
+            )
+            resulting_pose = self.tf.transformPose(
+              target_frame,
+              resulting_pose
+            )
+          cube_best_guess = self.location_info.local_odom_to_global(
+            cube_best_guess
+          )
+        except tf.Exception:
+          rospy.logwarn(
+            '{} cannot transform from {} to {}'.format(
+              self.swarmie_name,
+              resulting_pose.header.frame_id,
+              target_frame
+            )
+          )
 
 # vim: set ts=2 sw=2 expandtab:
