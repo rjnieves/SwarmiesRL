@@ -11,7 +11,8 @@ from geometry_msgs.msg import Pose2D
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import Range, Joy
 from apriltags_ros.msg import AprilTagDetectionArray
-from swarmie_msgs.msg import Skid
+from swarmie_msgs.msg import Skid, CubeReport
+from world import CoordinateTransform
 from . import LocationInformation
 
 class RlBehavior(object):
@@ -40,6 +41,11 @@ class RlBehavior(object):
   JOYSTICK_ANGULAR_AXIS = 3
   MAX_MOTOR_CMD = 255.0
   INIT_PLACE_RADIUS = 1.3
+  ARENA_X_RANGE = (-7.5, 7.5)
+  ARENA_Y_RANGE = (-7.5, 7.5)
+  GRID_QUANTIZATION = (30, 30)
+  NEST_X_TOP_LEFT = (-2.0, 2.0)
+  NEST_DIMS = (4.0, 4.0)
 
   def __init__(self, swarmie_name):
     self.swarmie_name = swarmie_name
@@ -47,11 +53,17 @@ class RlBehavior(object):
     self.location_info = LocationInformation()
     self.mode = RlBehavior.MANUAL_MODE
     self.tf = None
+    self.coord_xform = CoordinateTransform(
+      RlBehavior.ARENA_X_RANGE,
+      RlBehavior.ARENA_Y_RANGE,
+      RlBehavior.GRID_QUANTIZATION
+    )
     # Publishers ---------------------------------------------------------------
     self.status_pub = None
     self.hb_pub = None
     self.infolog_pub = None
     self.drive_cmd_pub = None
+    self.cube_report_pub = None
     # Timers -------------------------------------------------------------------
     self.status_timer = None
     self.timestep_timer = None
@@ -92,6 +104,11 @@ class RlBehavior(object):
     self.drive_cmd_pub = rospy.Publisher(
       '{}/driveControl'.format(self.swarmie_name),
       Skid,
+      queue_size=10
+    )
+    self.cube_report_pub = rospy.Publisher(
+      '/aprilCubeReports',
+      CubeReport,
       queue_size=10
     )
     # --------------------------------------------------------------------------
@@ -377,8 +394,32 @@ class RlBehavior(object):
               target_frame,
               resulting_pose
             )
+          (_, _, yaw) = euler_from_quaternion(
+            (
+              resulting_pose.pose.orientation.x,
+              resulting_pose.pose.orientation.y,
+              resulting_pose.pose.orientation.z,
+              resulting_pose.pose.orientation.w
+            )
+          )
           cube_best_guess = self.location_info.local_odom_to_global(
-            cube_best_guess
+            (
+              resulting_pose.pose.position.x,
+              resulting_pose.pose.position.y,
+              yaw
+            )
+          )
+          rospy.loginfo('AprilCube at real coords {}'.format(cube_best_guess))
+          cube_grid_coord = self.coord_xform.from_real_to_grid(
+            cube_best_guess[0:2]
+          )
+          rospy.loginfo('Reporting AprilCube at {}'.format(cube_grid_coord))
+          self.cube_report_pub.publish(
+            CubeReport(
+              grid_x = cube_grid_coord[0],
+              grid_y = cube_grid_coord[1],
+              swarmie_id = self.swarmie_id
+            )
           )
         except tf.Exception:
           rospy.logwarn(

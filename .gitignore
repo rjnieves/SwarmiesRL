@@ -52,3 +52,11 @@ CATKIN_IGNORE
 **/.DS_Store
 **/.catkin_tools
 **/tex-output
+**/.cache
+**/.bash_history
+**/.python_history
+**/.config
+**/.gazebo
+**/.nv
+**/.ros
+**/.sdformat

@@ -11,33 +11,15 @@ class PathPlanning(object):
   MOVE_NEXTCOL = (0, 1)
   MOVE_PREVCOL = (0, -1)
   ALL_MOVES = [MOVE_NEXTROW, MOVE_PREVROW, MOVE_NEXTCOL, MOVE_PREVCOL,]
-  XY_MOVE_XLATE = {
-    MOVE_NEXTROW: (0, -1),  # DOWN
-    MOVE_PREVROW: (0, 1),   # UP
-    MOVE_NEXTCOL: (1, 0),   # RIGHT
-    MOVE_PREVCOL: (-1, 0),  # LEFT
-  }
-
-  @classmethod
-  def translate_move(cls, matrix_move):
-    return (
-      cls.XY_MOVE_XLATE[matrix_move]
-      if matrix_move in cls.XY_MOVE_XLATE
-      else None
-    )
 
   def __init__(self, arena):
     self.arena = arena
-    self.coord_xform = arena.coord_xform
     self.reset()
 
   def calculate_path(self, from_grid, to_grid):
     self._planning_grid = self.arena.build_planning_grid()
-    matrix_path = self._path_search(
-      self.coord_xform.from_grid_to_matrix_pos(from_grid),
-      self.coord_xform.from_grid_to_matrix_pos(to_grid)
-    )
-    return self._translate_matrix_path(matrix_path)
+    matrix_path = self._path_search(from_grid, to_grid)
+    return matrix_path
 
   def reset(self):
     self._heap_storage = []
@@ -109,17 +91,6 @@ class PathPlanning(object):
       result.append(a_move)
     return result
 
-  def _translate_matrix_path(self, matrix_path):
-    result = map(
-      lambda step:
-        (
-          PathPlanning.translate_move(step[0]),
-          tuple(self.coord_xform.from_matrix_pos_to_grid(step[1]))
-        ),
-      matrix_path
-    )
-    return result
-
   def _update_heap(self, new_entry):
     (new_prio, new_value) = new_entry
     for idx, existing_entry in enumerate(self._heap_storage):
@@ -137,13 +108,17 @@ class PathPlanning(object):
 if __name__ == '__main__':
   from world import Arena, CoordinateTransform
   from events import SwarmieLocEvent
-  coord_xform = CoordinateTransform((-7.5, 7.5), (-7.5, 7.5), 2.0)
-  arena = Arena(1, coord_xform, (-4, 4), (8, 8))
-  arena.swarmie_loc_update(SwarmieLocEvent(0, (-15, 15)))
+  coord_xform = CoordinateTransform((-7.5, 7.5), (-7.5, 7.5), (30, 30,))
+  arena = Arena(1, coord_xform, (-2.0, 2.0), (4.0, 4.0))
+  swarmie_loc_evt = SwarmieLocEvent(0, (-7.5, 7.5))
+  arena.swarmie_loc_update(swarmie_loc_evt)
   planning_grid = arena.build_planning_grid()
   print '{}'.format(arena.grid_to_str(planning_grid))
   planner = PathPlanning(arena)
-  the_plan = planner.calculate_path((-15, 15), (6, 4))
+  the_plan = planner.calculate_path(
+    coord_xform.from_real_to_grid(swarmie_loc_evt.swarmie_loc),
+    coord_xform.from_real_to_grid((3.0, -2.5))
+  )
   print '{}'.format(the_plan)
 
 # vim: set ts=2 sw=2 expandtab:

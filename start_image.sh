@@ -1,7 +1,8 @@
 #!/bin/bash
 
-nvidia-docker \
+docker \
 	run \
+    --runtime=nvidia \
 	-it \
 	--rm \
 	-v "/tmp/.X11-unix:/tmp/.X11-unix:rw" \
