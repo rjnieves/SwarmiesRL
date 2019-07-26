@@ -13,7 +13,7 @@ from sensor_msgs.msg import Range, Joy
 from apriltags_ros.msg import AprilTagDetectionArray
 from swarmie_msgs.msg import Skid, CubeReport
 from world import CoordinateTransform
-from . import LocationInformation
+from . import LocationInformation, TagState, PidLoop
 
 class RlBehavior(object):
   NAME_TO_ID_MAP = [
@@ -58,6 +58,13 @@ class RlBehavior(object):
       RlBehavior.ARENA_Y_RANGE,
       RlBehavior.GRID_QUANTIZATION
     )
+    self.tag_state = None
+    self.approaching = False
+    self._latest_tag_list = None
+    self.linear_vel = 0.
+    self.angular_vel = 0.
+    self.vel_pid = None
+    self.yaw_pid = None
     # Publishers ---------------------------------------------------------------
     self.status_pub = None
     self.hb_pub = None
@@ -78,11 +85,18 @@ class RlBehavior(object):
     self.sonar_sync = None
     self.joy_sub = None
     self.target_sub = None
+    self.maint_cmd_sub = None
   
   def run(self):
     print('Welcome to the world of tomorrow {}!'.format(self.swarmie_name))
     rospy.init_node('{}_BEHAVIOUR'.format(self.swarmie_name))
     self.tf = TransformListener()
+    self.tag_state = TagState(
+      self.swarmie_name,
+      self.location_info,
+      self.tf,
+      self.coord_xform
+    )
     # --------------------------------------------------------------------------
     # Set up all the publishers
     #
@@ -161,6 +175,12 @@ class RlBehavior(object):
       callback=self._on_tags_spotted,
       queue_size=10
     )
+    self.maint_cmd_sub = rospy.Subscriber(
+      '{}/maintCmd'.format(self.swarmie_name),
+      String,
+      callback=self._on_maint_cmd,
+      queue_size=10
+    )
     # --------------------------------------------------------------------------
     # Set up all the timers
     #
@@ -201,6 +221,8 @@ class RlBehavior(object):
       )
 
   def _on_timestep_timer(self, event):
+    # --------------------------------------------------------------------------
+    # Initial timestep
     if not self.initialized:
       self.infolog_pub.publish(
         String(
@@ -214,6 +236,117 @@ class RlBehavior(object):
           self.location_info.odom_center[0],
           self.location_info.odom_center[1]
         )
+      )
+    # --------------------------------------------------------------------------
+    # Update tag information with latest message
+    self.tag_state.update(self._latest_tag_list).filter().sort()
+    for a_tag_report in self.tag_state.cube_tags:
+      self.cube_report_pub.publish(
+        CubeReport(
+          grid_x=a_tag_report.grid_coords[0],
+          grid_y=a_tag_report.grid_coords[1],
+          swarmie_id=self.swarmie_id
+        )
+      )
+    # --------------------------------------------------------------------------
+    # TEST CODE: Execute approach if asked to
+    if self.approaching and self.tag_state.cube_tags:
+      closest_cube = self.tag_state.cube_tags[0]
+      rospy.loginfo(
+        '{} approaching cube at grid {}, {} meters off.'.format(
+          self.swarmie_name,
+          closest_cube.grid_coords,
+          closest_cube.tag_dist
+        )
+      )
+      if closest_cube.tag_dist > 0.15:
+        rospy.loginfo(
+          '{} checking PID loops'.format(
+            self.swarmie_name
+          )
+        )
+        if self.vel_pid is None:
+          self.vel_pid = PidLoop(PidLoop.Config.make_slow_vel())
+        if self.yaw_pid is None:
+          self.yaw_pid = PidLoop(PidLoop.Config.make_slow_yaw())
+        rospy.loginfo(
+          '{} PID loops ready'.format(
+            self.swarmie_name
+          )
+        )
+        vel_setpoint = closest_cube.tag_dist * 0.20
+        vel_setpoint = min(0.2, vel_setpoint)
+        vel_setpoint = max(0.1, vel_setpoint)
+        vel_error = vel_setpoint - self.linear_vel
+        rospy.loginfo(
+          '{} velocity set point is ({}), current is ({}), making an error of ({})'.format(
+            self.swarmie_name,
+            vel_setpoint,
+            self.linear_vel,
+            vel_error
+          )
+        )
+        yaw_setpoint = math.pi / 4.
+        yaw_current = math.atan(
+          closest_cube.base_link_coords[0] / closest_cube.tag_dist
+        ) * 1.0
+        yaw_error = yaw_setpoint - yaw_current
+        rospy.loginfo(
+          '{} yaw set point is ({}), current is ({}), making an error of ({})'.format(
+            self.swarmie_name,
+            yaw_setpoint,
+            yaw_current,
+            yaw_error
+          )
+        )
+        vel_output = self.vel_pid.pid_out(vel_error, vel_setpoint)
+        yaw_output = self.yaw_pid.pid_out(yaw_error, yaw_setpoint)
+        rospy.loginfo(
+          '{} PID output for velocity ({}), yaw ({})'.format(
+            self.swarmie_name,
+            vel_output,
+            yaw_output
+          )
+        )
+        left_cmd = vel_output - yaw_output
+        left_cmd = min(180., left_cmd)
+        left_cmd = max(-180., left_cmd)
+        right_cmd = vel_output + yaw_output
+        right_cmd = min(180., right_cmd)
+        right_cmd = max(-180., right_cmd)
+        rospy.loginfo(
+          '{} PID left cmd ({}) right cmd ({})'.format(
+            self.swarmie_name,
+            left_cmd,
+            right_cmd
+          )
+        )
+        self.drive_cmd_pub.publish(
+          Skid(left=left_cmd, right=right_cmd)
+        )
+      else:
+        rospy.loginfo(
+          '{} done with approach to cube.'.format(
+            self.swarmie_name
+          )
+        )
+        self.vel_pid = None
+        self.yaw_pid = None
+        self.approaching = False
+        self.drive_cmd_pub.publish(
+          Skid(left=0., right=0.)
+        )
+    elif self.approaching:
+      rospy.loginfo(
+        '{} asked to approach non-existent cube.'.format(
+          self.swarmie_name
+        )
+      )
+      self.approaching = False
+      self.vel_pid = None
+      self.yaw_pid = None
+      self.drive_cmd_pub.publish(
+        Skid(left=0., right=0.)
       )
 
   def _on_odom_update(self, sample):
@@ -241,6 +374,8 @@ class RlBehavior(object):
         yaw
       ]
     )
+    self.linear_vel = sample.twist.twist.linear.x
+    self.angular_vel = sample.twist.twist.angular.z
 
   def _on_map_update(self, sample):
     """Map-based position update callback.
@@ -371,63 +506,15 @@ class RlBehavior(object):
     :param tag_list: List of April tags spotted by CV algorithm.
     :type tag_list: apriltags_ros.msg.AprilTagDetectionArray
     """
-    if not self.initialized:
-      return
-    for a_tag_detect in tag_list.detections:
-      if a_tag_detect.id == 0:
-        target_frame = ''
-        resulting_pose = a_tag_detect.pose
-        cube_best_guess = None
-        try:
-          for target_id in ['base_link', 'odom',]:
-            target_frame = '{swarmie}/{target}'.format(
-              swarmie=self.swarmie_name,
-              target=target_id
-            )
-            self.tf.waitForTransform(
-              target_frame,
-              resulting_pose.header.frame_id,
-              resulting_pose.header.stamp,
-              rospy.Duration(nsecs=100000000)
-            )
-            resulting_pose = self.tf.transformPose(
-              target_frame,
-              resulting_pose
-            )
-          (_, _, yaw) = euler_from_quaternion(
-            (
-              resulting_pose.pose.orientation.x,
-              resulting_pose.pose.orientation.y,
-              resulting_pose.pose.orientation.z,
-              resulting_pose.pose.orientation.w
-            )
-          )
-          cube_best_guess = self.location_info.local_odom_to_global(
-            (
-              resulting_pose.pose.position.x,
-              resulting_pose.pose.position.y,
-              yaw
-            )
-          )
-          rospy.loginfo('AprilCube at real coords {}'.format(cube_best_guess))
-          cube_grid_coord = self.coord_xform.from_real_to_grid(
-            cube_best_guess[0:2]
-          )
-          rospy.loginfo('Reporting AprilCube at {}'.format(cube_grid_coord))
-          self.cube_report_pub.publish(
-            CubeReport(
-              grid_x = cube_grid_coord[0],
-              grid_y = cube_grid_coord[1],
-              swarmie_id = self.swarmie_id
-            )
-          )
-        except tf.Exception:
-          rospy.logwarn(
-            '{} cannot transform from {} to {}'.format(
-              self.swarmie_name,
-              resulting_pose.header.frame_id,
-              target_frame
-            )
-          )
+    self._latest_tag_list = tag_list
+
+  def _on_maint_cmd(self, the_cmd):
+    cmd_str = str(the_cmd.data).lower()
+    if cmd_str == 'approach':
+      self.approaching = True
+    elif cmd_str == 'cancel_approach':
+      self.approaching = False
+    else:
+      rospy.loginfo('Did not recognize maintenance command: {}'.format(cmd_str))
 
 # vim: set ts=2 sw=2 expandtab:

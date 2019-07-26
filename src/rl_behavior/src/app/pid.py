@@ -7,22 +7,47 @@ import numpy as np
 
 class PidLoop(object):
   class Config(object):
-    def __init__(self):
+    def __init__(self, **kwargs):
       super(PidLoop.Config, self).__init__()
-      self.kp = 0.
-      self.ki = 0.
-      self.kd = 0.
-      self.sat_upper = 255.
-      self.sat_lower = -255.
-      self.anti_windup = self.sat_upper/2.
-      self.error_hist_length = 4
-      self.always_integral = False
-      self.reset_on_setpoint = True
-      self.feed_forward_multiplier = 0.
-      self.integral_dead_zone = 0.01
-      self.integral_error_history_length = 10000
-      self.integral_max = 255./2.
-      self.derivative_alpha = 0.7
+      self.kp = float(kwargs.get('kp', 0.))
+      self.ki = float(kwargs.get('ki', 0.))
+      self.kd = float(kwargs.get('kd', 0.))
+      self.sat_upper = float(kwargs.get('sat_upper', 255.))
+      self.sat_lower = float(kwargs.get('sat_lower', -255.))
+      self.anti_windup = float(kwargs.get('anti_windup', self.sat_upper/2.))
+      self.error_hist_length = int(kwargs.get('error_hist_length', 4))
+      self.always_integral = bool(kwargs.get('always_integral', False))
+      self.reset_on_setpoint = bool(kwargs.get('reset_on_setpoint', True))
+      self.feed_forward_multiplier = float(kwargs.get('feed_forward_multiplier', 0.))
+      self.integral_dead_zone = float(kwargs.get('integral_dead_zone', 0.01))
+      self.integral_error_history_length = int(kwargs.get('integral_error_history_length', 10000))
+      self.integral_max = float(kwargs.get('integral_max', self.sat_upper/2.))
+      self.derivative_alpha = float(kwargs.get('derivative_alpha', 0.7))
+
+    @classmethod
+    def make_slow_vel(cls):
+      return cls(
+        # kp=100.,
+        # ki=8.,
+        # kd=1.1,
+        # always_integral=True,
+        # feed_forward_multiplier=320.
+        kp=75.,
+        ki=0.,
+        kd=0.
+      )
+    @classmethod
+    def make_slow_yaw(cls):
+      return cls(
+        # kp=70.,
+        # ki=16.,
+        # kd=10.,
+        # anti_windup=255./4.,
+        # integral_max=255./6.
+        kp=100.,
+        ki=0.,
+        kd=0.
+      )
 
   def __init__(self, config=None):
     super(PidLoop, self).__init__()
