@@ -76,5 +76,5 @@
     "**/logs": true
   },
   "editor.wordWrap": "wordWrapColumn",
-  "python.pythonPath": "/home/rjnieves/pythonenv/SWARMIES-RL/bin/python"
+  "python.pythonPath": "~/pythonenv/SWARMIES-RL/bin/python"
 }

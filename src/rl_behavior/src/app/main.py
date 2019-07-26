@@ -239,41 +239,39 @@ class RlBehavior(object):
       )
     # --------------------------------------------------------------------------
     # Update tag information with latest message
-    self.tag_state.update(self._latest_tag_list).filter().sort()
-    for a_tag_report in self.tag_state.cube_tags:
-      self.cube_report_pub.publish(
-        CubeReport(
-          grid_x=a_tag_report.grid_coords[0],
-          grid_y=a_tag_report.grid_coords[1],
-          swarmie_id=self.swarmie_id
+    try:
+      self.tag_state.update(self._latest_tag_list).sort()
+      if event.last_real is not None:
+        self.tag_state.dock_age(rospy.Time.now() - event.last_real)
+      for a_tag_report in self.tag_state.cube_tags:
+        self.cube_report_pub.publish(
+          CubeReport(
+            grid_x=a_tag_report.grid_coords[0],
+            grid_y=a_tag_report.grid_coords[1],
+            swarmie_id=self.swarmie_id
+          )
         )
+    except Exception as ex:
+      rospy.logwarn(
+        '{} could not update tags: {}'.format(self.swarmie_name, ex.message)
       )
     # --------------------------------------------------------------------------
     # TEST CODE: Execute approach if asked to
     if self.approaching and self.tag_state.cube_tags:
       closest_cube = self.tag_state.cube_tags[0]
       rospy.loginfo(
-        '{} approaching cube at grid {}, {} meters off.'.format(
+        '{} approaching cube at grid {}, base_link {}, {} meters off.'.format(
           self.swarmie_name,
           closest_cube.grid_coords,
+          closest_cube.base_link_coords,
           closest_cube.tag_dist
         )
       )
       if closest_cube.tag_dist > 0.15:
-        rospy.loginfo(
-          '{} checking PID loops'.format(
-            self.swarmie_name
-          )
-        )
         if self.vel_pid is None:
           self.vel_pid = PidLoop(PidLoop.Config.make_slow_vel())
         if self.yaw_pid is None:
           self.yaw_pid = PidLoop(PidLoop.Config.make_slow_yaw())
-        rospy.loginfo(
-          '{} PID loops ready'.format(
-            self.swarmie_name
-          )
-        )
         vel_setpoint = closest_cube.tag_dist * 0.20
         vel_setpoint = min(0.2, vel_setpoint)
         vel_setpoint = max(0.1, vel_setpoint)
@@ -286,10 +284,10 @@ class RlBehavior(object):
             vel_error
           )
         )
-        yaw_setpoint = math.pi / 4.
+        yaw_setpoint = 0.
         yaw_current = math.atan(
-          closest_cube.base_link_coords[0] / closest_cube.tag_dist
-        ) * 1.0
+          closest_cube.base_link_coords[1] / closest_cube.base_link_coords[0]
+        )
         yaw_error = yaw_setpoint - yaw_current
         rospy.loginfo(
           '{} yaw set point is ({}), current is ({}), making an error of ({})'.format(
@@ -300,7 +298,9 @@ class RlBehavior(object):
           )
         )
         vel_output = self.vel_pid.pid_out(vel_error, vel_setpoint)
-        yaw_output = self.yaw_pid.pid_out(yaw_error, yaw_setpoint)
+        # Negating the sign of the error since transverse y-axis positive
+        # direction is to the left.
+        yaw_output = self.yaw_pid.pid_out(-1. * yaw_error, yaw_setpoint)
         rospy.loginfo(
           '{} PID output for velocity ({}), yaw ({})'.format(
             self.swarmie_name,

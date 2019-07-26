@@ -34,7 +34,15 @@ class TagState(object):
       self.grid_coords = tuple(grid_coords)
       self.base_link_coords = tuple(base_link_coords)
       self.tag_dist = distance.euclidean((0., 0.), self.base_link_coords[0:2])
+      self.age = rospy.Duration(1, 500000000)
     
+    def dock_age(self, by_amt):
+      self.age -= min(self.age, by_amt)
+
+    @property
+    def alive(self):
+      return bool(self.age)
+
     def __repr__(self):
       return (
         'TagState.Report(' +
@@ -53,22 +61,12 @@ class TagState(object):
     self.location_info = location_info
     self.coord_xform = coord_xform
     self.tf = tf
-    self._reset()
+    self.reset()
   
-  def _reset(self):
+  def reset(self):
     self.cube_tags = []
     self.boundary_tags = []
     self.nest_tags = []
-
-  def filter(self):
-    seen_tags = set()
-    filtered_tags = []
-    for a_cube_tag in self.cube_tags:
-      if not a_cube_tag.world_coords in seen_tags:
-        seen_tags.add(a_cube_tag.world_coords)
-        filtered_tags.append(a_cube_tag)
-    self.cube_tags = filtered_tags
-    return self
 
   def sort(self):
     self.cube_tags.sort(key=TagState.Report.sort_key)
@@ -76,8 +74,16 @@ class TagState(object):
     self.nest_tags.sort(key=TagState.Report.sort_key)
     return self
 
+  def dock_age(self, by_amt):
+    for a_list in [self.cube_tags, self.boundary_tags, self.nest_tags]:
+      for a_tag_report in a_list:
+        a_tag_report.dock_age(by_amt)
+    self.cube_tags = [a_tag for a_tag in self.cube_tags if a_tag.alive]
+    self.boundary_tags = [a_tag for a_tag in self.boundary_tags if a_tag.alive]
+    self.nest_tags = [a_tag for a_tag in self.nest_tags if a_tag.alive]
+    return self
+
   def update(self, tag_list):
-    self._reset()
     for a_tag_detect in tag_list.detections:
       target_frame = ''
       resulting_pose = a_tag_detect.pose
@@ -107,15 +113,15 @@ class TagState(object):
             target_frame,
             resulting_pose
           )
-          (_, _, yaw) = euler_from_quaternion(
-            (
-              resulting_pose.pose.orientation.x,
-              resulting_pose.pose.orientation.y,
-              resulting_pose.pose.orientation.z,
-              resulting_pose.pose.orientation.w
-            )
-          )
           if target_id == 'base_link':
+            (_, _, yaw) = euler_from_quaternion(
+              (
+                resulting_pose.pose.orientation.x,
+                resulting_pose.pose.orientation.y,
+                resulting_pose.pose.orientation.z,
+                resulting_pose.pose.orientation.w
+              )
+            )
             base_link_coords = (
               resulting_pose.pose.position.x,
               resulting_pose.pose.position.y,
@@ -125,25 +131,23 @@ class TagState(object):
           (
             round(resulting_pose.pose.position.x, 1),
             round(resulting_pose.pose.position.y, 1),
-            round(yaw, 2)
+            0.
           )
         )
-        rospy.logdebug('AprilTag at real coords {}'.format(tag_best_guess))
         tag_grid_coord = self.coord_xform.from_real_to_grid(
           tag_best_guess[0:2]
         )
-        rospy.logdebug('Identifying AprilTag at {}'.format(tag_grid_coord))
         tag_report = TagState.Report(
-          tag_best_guess[0:2],
-          tag_grid_coord,
-          base_link_coords
+          world_coords=tag_best_guess[0:2],
+          grid_coords=tag_grid_coord,
+          base_link_coords=base_link_coords
         )
         if a_tag_detect.id == 0:
-          self.cube_tags.append(tag_report)
+          self._merge_report(tag_report, self.cube_tags)
         elif a_tag_detect.id == 128:
-          self.boundary_tags.append(tag_report)
+          self._merge_report(tag_report, self.boundary_tags)
         elif a_tag_detect.id == 255:
-          self.nest_tags.append(tag_report)
+          self._merge_report(tag_report, self.nest_tags)
       except tf.Exception:
         rospy.logwarn(
           '{} cannot transform from {} to {}'.format(
@@ -153,5 +157,15 @@ class TagState(object):
           )
         )
     return self
+
+  def _merge_report(self, tag_report, tag_list):
+    tag_idx = None
+    for idx, a_tag in enumerate(tag_list):
+      if a_tag.world_coords == tag_report.world_coords:
+        tag_idx = idx
+        break
+    if tag_idx is not None:
+      del tag_list[tag_idx]
+    tag_list.append(tag_report)
 
 # vim: set ts=2 sw=2 expandtab:

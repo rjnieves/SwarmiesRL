@@ -27,14 +27,14 @@ class PidLoop(object):
     @classmethod
     def make_slow_vel(cls):
       return cls(
-        # kp=100.,
-        # ki=8.,
-        # kd=1.1,
-        # always_integral=True,
-        # feed_forward_multiplier=320.
-        kp=75.,
-        ki=0.,
-        kd=0.
+        kp=100.,
+        ki=8.,
+        kd=1.1,
+        always_integral=True,
+        feed_forward_multiplier=320.
+        # kp=75.,
+        # ki=0.,
+        # kd=0.
       )
     @classmethod
     def make_slow_yaw(cls):
