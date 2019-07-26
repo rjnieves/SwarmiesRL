@@ -267,7 +267,7 @@ class RlBehavior(object):
           closest_cube.tag_dist
         )
       )
-      if closest_cube.tag_dist > 0.15:
+      if closest_cube.tag_dist > 0.23:
         if self.vel_pid is None:
           self.vel_pid = PidLoop(PidLoop.Config.make_slow_vel())
         if self.yaw_pid is None:
