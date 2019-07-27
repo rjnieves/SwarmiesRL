@@ -21,8 +21,7 @@ class ApproachAction(object):
     self.vel_pid = None
     self.yaw_pid = None
   
-  def update(self, **kwargs):
-    linear_vel = float(kwargs.get('linear_vel', 0.))
+  def update(self, swarmie_state):
     if not self.tag_state.cube_tags:
       rospy.loginfo(
         '{} asked to approach non-existent cube.'.format(
@@ -51,12 +50,12 @@ class ApproachAction(object):
       vel_setpoint = closest_cube.tag_dist * ApproachAction.DIST_TO_VEL_KP
       vel_setpoint = min(ApproachAction.MAX_APPROACH_VEL, vel_setpoint)
       vel_setpoint = max(ApproachAction.MIN_APPROACH_VEL, vel_setpoint)
-      vel_error = vel_setpoint - linear_vel
+      vel_error = vel_setpoint - swarmie_state.linear_vel
       rospy.loginfo(
         '{} velocity set point is ({}), current is ({}), making an error of ({})'.format(
           self.swarmie_name,
           vel_setpoint,
-          linear_vel,
+          swarmie_state.linear_vel,
           vel_error
         )
       )

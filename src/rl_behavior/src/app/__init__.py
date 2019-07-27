@@ -2,7 +2,7 @@
 """
 
 from .util import isclose
-from .location import LocationInformation
+from .swarmiestate import SwarmieState
 from .tagstate import TagState
 from .pid import PidLoop
 from .pathplan import PathPlanning

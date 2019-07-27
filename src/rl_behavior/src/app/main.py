@@ -16,7 +16,7 @@ from apriltags_ros.msg import AprilTagDetectionArray
 from swarmie_msgs.msg import Skid, CubeReport
 from world import CoordinateTransform
 from action import ApproachAction
-from . import LocationInformation, TagState, PidLoop
+from . import SwarmieState, TagState, PidLoop
 
 class RlBehavior(object):
   NAME_TO_ID_MAP = [
@@ -53,7 +53,7 @@ class RlBehavior(object):
   def __init__(self, swarmie_name):
     self.swarmie_name = swarmie_name
     self.swarmie_id = RlBehavior.NAME_TO_ID_MAP.index(swarmie_name)
-    self.location_info = LocationInformation()
+    self.swarmie_state = SwarmieState(self.swarmie_name)
     self.mode = RlBehavior.MANUAL_MODE
     self.tf = None
     self.coord_xform = CoordinateTransform(
@@ -63,8 +63,6 @@ class RlBehavior(object):
     )
     self.tag_state = None
     self._latest_tag_list = None
-    self.linear_vel = 0.
-    self.angular_vel = 0.
     self._current_action = None
     # Publishers ---------------------------------------------------------------
     self.status_pub = None
@@ -94,7 +92,7 @@ class RlBehavior(object):
     self.tf = TransformListener()
     self.tag_state = TagState(
       self.swarmie_name,
-      self.location_info,
+      self.swarmie_state,
       self.tf,
       self.coord_xform
     )
@@ -201,7 +199,7 @@ class RlBehavior(object):
   
   @property
   def initialized(self):
-    return self.location_info.ready
+    return self.swarmie_state.ready
 
   def _on_hb_timer(self, event):
     hb_msg = String()
@@ -233,12 +231,12 @@ class RlBehavior(object):
             data='{} willing to learn!'.format(self.swarmie_name)
           )
         )
-        self.location_info.initialize_centers(RlBehavior.INIT_PLACE_RADIUS)
+        self.swarmie_state.initialize_centers(RlBehavior.INIT_PLACE_RADIUS)
         rospy.loginfo(
           '{} perceived center in odom frame at ({},{})'.format(
             self.swarmie_name,
-            self.location_info.odom_center[0],
-            self.location_info.odom_center[1]
+            self.swarmie_state.odom_center[0],
+            self.swarmie_state.odom_center[1]
           )
         )
       # ------------------------------------------------------------------------
@@ -261,8 +259,7 @@ class RlBehavior(object):
       action_result = None
       if self._current_action is not None:
         action_result = self._current_action.update(
-          odom_state=self.location_info.odom_current,
-          linear_vel=self.linear_vel
+          swarmie_state=self.swarmie_state
         )
       if action_result is not None:
         self.drive_cmd_pub.publish(action_result)
@@ -400,15 +397,15 @@ class RlBehavior(object):
         sample.pose.pose.orientation.w
       )
     )
-    self.location_info.odom_current = np.array(
+    self.swarmie_state.odom_current = np.array(
       [
         sample.pose.pose.position.x,
         sample.pose.pose.position.y,
         yaw
       ]
     )
-    self.linear_vel = sample.twist.twist.linear.x
-    self.angular_vel = sample.twist.twist.angular.z
+    self.swarmie_state.linear_vel = sample.twist.twist.linear.x
+    self.swarmie_state.angular_vel = sample.twist.twist.angular.z
 
   def _on_map_update(self, sample):
     """Map-based position update callback.
@@ -428,7 +425,7 @@ class RlBehavior(object):
         sample.pose.pose.orientation.w
       )
     )
-    self.location_info.map_current = np.array(
+    self.swarmie_state.map_current = np.array(
       [
         sample.pose.pose.position.x,
         sample.pose.pose.position.y,
