@@ -15,7 +15,7 @@ from sensor_msgs.msg import Range, Joy
 from apriltags_ros.msg import AprilTagDetectionArray
 from swarmie_msgs.msg import Skid, CubeReport
 from world import CoordinateTransform
-from action import ApproachAction, TurnAction
+from action import ApproachAction, TurnAction, DriveAction
 from . import SwarmieState, TagState, PidLoop
 
 class RlBehavior(object):
@@ -550,6 +550,10 @@ class RlBehavior(object):
       self._current_action = TurnAction(self.swarmie_name, (math.pi / 2.))
     elif cmd_str == 'turn_south':
       self._current_action = TurnAction(self.swarmie_name, -1. * (math.pi / 2.))
+    elif cmd_str == 'drive_forward':
+      self._current_action = DriveAction(self.swarmie_name)
+    elif cmd_str == 'drive_backward':
+      self._current_action = DriveAction(self.swarmie_name, forward=False)
     elif cmd_str == 'halt':
       self._current_action = None
     else:
