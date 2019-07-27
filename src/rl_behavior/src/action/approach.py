@@ -28,7 +28,6 @@ class ApproachAction(object):
           self.swarmie_name
         )
       )
-      self.approaching = False
       self.vel_pid = None
       self.yaw_pid = None
       return None

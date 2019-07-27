@@ -15,7 +15,7 @@ from sensor_msgs.msg import Range, Joy
 from apriltags_ros.msg import AprilTagDetectionArray
 from swarmie_msgs.msg import Skid, CubeReport
 from world import CoordinateTransform
-from action import ApproachAction
+from action import ApproachAction, TurnAction
 from . import SwarmieState, TagState, PidLoop
 
 class RlBehavior(object):
@@ -242,7 +242,8 @@ class RlBehavior(object):
       # ------------------------------------------------------------------------
       # Update tag information with latest message
       timestep_step = 'Tag Sightings Update'
-      self.tag_state.update(self._latest_tag_list).sort()
+      if self._latest_tag_list is not None:
+        self.tag_state.update(self._latest_tag_list).sort()
       if event.last_real is not None:
         self.tag_state.dock_age(rospy.Time.now() - event.last_real)
       for a_tag_report in self.tag_state.cube_tags:
@@ -266,23 +267,22 @@ class RlBehavior(object):
       else:
         self._current_action = None
         self.drive_cmd_pub.publish(Skid(left=0., right=0.))
-    except Exception:
+    except Exception as ex:
       ex_info = sys.exc_info()
       file_name = '<unknown>'
       line_num = '<unknown>'
       func_name = '<unknown>'
-      message = '<unknown>'
       if len(ex_info) > 2 and ex_info[2] is not None:
         tb_info = traceback.extract_tb(ex_info[2], 1)
-        if len(tb_info) > 1 and len(tb_info[0]) > 3:
-          (file_name, line_num, func_name, message) = tb_info[0]
+        if len(tb_info) > 0 and len(tb_info[0]) > 3:
+          (file_name, line_num, func_name, _) = tb_info[0]
       rospy.logwarn(
         'Exception raised during {} at file {} function {} line {}: {}'.format(
           timestep_step,
           file_name,
           func_name,
           line_num,
-          message
+          ex.message
         )
       )
     # --------------------------------------------------------------------------
@@ -542,6 +542,14 @@ class RlBehavior(object):
     cmd_str = str(the_cmd.data).lower()
     if cmd_str == 'approach':
       self._current_action = ApproachAction(self.swarmie_name, self.tag_state)
+    elif cmd_str == 'turn_east':
+      self._current_action = TurnAction(self.swarmie_name, 0.)
+    elif cmd_str == 'turn_west':
+      self._current_action = TurnAction(self.swarmie_name, -1. * math.pi)
+    elif cmd_str == 'turn_north':
+      self._current_action = TurnAction(self.swarmie_name, (math.pi / 2.))
+    elif cmd_str == 'turn_south':
+      self._current_action = TurnAction(self.swarmie_name, -1. * (math.pi / 2.))
     elif cmd_str == 'halt':
       self._current_action = None
     else:

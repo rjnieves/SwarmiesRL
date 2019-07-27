@@ -48,6 +48,11 @@ class PidLoop(object):
         ki=0.,
         kd=0.
       )
+    @classmethod
+    def make_turn_yaw(cls):
+      return cls(
+        kp=30.,
+      )
 
   def __init__(self, config=None):
     super(PidLoop, self).__init__()
