@@ -5,7 +5,7 @@ import math
 import numpy as np
 import rospy
 from swarmie_msgs.msg import Skid
-from app import PidLoop
+from utility import PidLoop
 
 class TurnAction(object):
   MIN_SKID_CMD = -180.

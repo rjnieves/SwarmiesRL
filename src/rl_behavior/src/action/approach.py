@@ -4,7 +4,7 @@
 import math
 import rospy
 from swarmie_msgs.msg import Skid
-from app import PidLoop
+from utility import PidLoop
 
 class ApproachAction(object):
   CUBE_TARGET_DISTANCE = 0.25 # meters

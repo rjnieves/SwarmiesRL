@@ -17,7 +17,7 @@ from apriltags_ros.msg import AprilTagDetectionArray
 from swarmie_msgs.msg import Skid, CubeReport
 from world import CoordinateTransform, Arena
 from action import ApproachAction, TurnAction, DriveAction, MoveToCellAction
-from . import SwarmieState, TagState, PidLoop
+from . import SwarmieState, TagState
 
 class RlBehavior(object):
   NAME_TO_ID_MAP = [

@@ -4,7 +4,7 @@
 import math
 import numpy as np
 import rospy
-from app import PathPlanning
+from utility import PathPlanning
 from action import TurnAction, DriveAction
 from swarmie_msgs.msg import Skid
 
