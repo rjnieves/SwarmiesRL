@@ -16,8 +16,10 @@ class PathPlanning(object):
     self.arena = arena
     self.reset()
 
-  def calculate_path(self, from_grid, to_grid):
-    self._planning_grid = self.arena.build_planning_grid()
+  def calculate_path(self, from_grid, to_grid, nest_as_obstacle=True):
+    self._planning_grid = self.arena.build_planning_grid(
+      include_nest=nest_as_obstacle
+    )
     matrix_path = self._path_search(from_grid, to_grid)
     return matrix_path
 

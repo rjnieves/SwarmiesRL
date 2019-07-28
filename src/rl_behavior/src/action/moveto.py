@@ -34,6 +34,7 @@ class MoveToCellAction(object):
     self.coord_xform = arena.coord_xform
     self._policy = None
     self._current_sub_action = None
+    self._avoid_nest = not arena.grid_loc_in_nest(dest_coords)
   
   def _already_turning_to(self, yaw_angle):
     return (
@@ -57,7 +58,7 @@ class MoveToCellAction(object):
       swarmie_yaw = abs_swarmie_yaw
     if self._policy is None:
       self._policy = self.path_planner.calculate_path(
-        swarmie_grid_pos, self.dest_coords
+        swarmie_grid_pos, self.dest_coords, nest_as_obstacle=self._avoid_nest
       )
       rospy.loginfo(
         '{} created new path plan from {} to {}: {}'.format(

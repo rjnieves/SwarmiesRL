@@ -91,6 +91,13 @@ class Arena(object):
       np.logical_or(result, self._nest_mask, out=result)
     return result
 
+  def real_loc_in_nest(self, real_coords):
+    grid_coords = self.coord_xform.from_real_to_grid(real_coords)
+    return self.grid_loc_in_nest(grid_coords)
+
+  def grid_loc_in_nest(self, grid_coords):
+    return self._nest_mask[grid_coords]
+
   def grid_to_str(self, grid):
     return '\n'.join(
       map(
