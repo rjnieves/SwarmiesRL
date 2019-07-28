@@ -29,4 +29,10 @@ class ClawFingersAction(object):
       fingers=Float32(data=self.position)
     ) if self._travel_time_left else None
 
+  def __repr__(self):
+    return 'ClawFingersAction(swarmie_name={}, position={})'.format(
+      repr(self.swarmie_name),
+      repr(self.position)
+    )
+
 # vim: set ts=2 sw=2 expandtab:

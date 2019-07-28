@@ -8,5 +8,7 @@ from .moveto import MoveToCellAction
 from .clawwrist import ClawWristAction
 from .clawfingers import ClawFingersAction
 from .approach import ApproachAction
+from .pickup import PickupAction
+from .dropoff import DropOffAction
 
 # vim: set ts=2 sw=2 expandtab:

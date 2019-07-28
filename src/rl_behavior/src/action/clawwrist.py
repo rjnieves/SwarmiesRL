@@ -28,4 +28,9 @@ class ClawWristAction(object):
       wrist=Float32(data=self.target_position)
     ) if self._travel_time_left else None
 
+  def __repr__(self):
+    return 'CrawWristAction(swarmie_name={}, position={})'.format(
+      repr(self.swarmie_name), repr(self.target_position)
+    )
+
 # vim: set ts=2 sw=2 expandtab:
