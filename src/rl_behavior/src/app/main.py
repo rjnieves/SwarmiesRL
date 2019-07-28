@@ -9,7 +9,7 @@ import message_filters
 import tf
 from tf import TransformListener
 from tf.transformations import euler_from_quaternion
-from std_msgs.msg import String, UInt8
+from std_msgs.msg import String, UInt8, Float32
 from geometry_msgs.msg import Pose2D
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import Range, Joy
@@ -77,6 +77,8 @@ class RlBehavior(object):
     self.infolog_pub = None
     self.drive_cmd_pub = None
     self.cube_report_pub = None
+    self.wrist_cmd_pub = None
+    self.fingers_cmd_pub = None
     # Timers -------------------------------------------------------------------
     self.status_timer = None
     self.timestep_timer = None
@@ -130,6 +132,16 @@ class RlBehavior(object):
       '/aprilCubeReports',
       CubeReport,
       queue_size=10
+    )
+    self.wrist_cmd_pub = rospy.Publisher(
+      '{}/wristAngle/cmd'.format(self.swarmie_name),
+      Float32,
+      queue_size=1
+    )
+    self.fingers_cmd_pub = rospy.Publisher(
+      '{}/fingerAngle/cmd'.format(self.swarmie_name),
+      Float32,
+      queue_size=1
     )
     # --------------------------------------------------------------------------
     # Set up all the subscribers
@@ -227,7 +239,14 @@ class RlBehavior(object):
       )
 
   def _on_timestep_timer(self, event):
+    """
+    :param event:
+    :type event: rospy.timer.TimerEvent
+    """
     timestep_step = ''
+    time_since_last_step = None
+    if event.last_real is not None:
+      time_since_last_step = (rospy.Time.now() - event.last_real)
     try:
       # ------------------------------------------------------------------------
       # Initial timestep
@@ -258,14 +277,18 @@ class RlBehavior(object):
           self.hb_timer.shutdown()
           self.status_timer.shutdown()
           self.timestep_timer.shutdown()
-          rospy.signal_shutdown('Odometry data not available for {}'.format(self.swarmie_name))
+          rospy.signal_shutdown(
+            'Odometry data not available for {}'.format(
+              self.swarmie_name
+            )
+          )
       # ------------------------------------------------------------------------
       # Update tag information with latest message
       timestep_step = 'Tag Sightings Update'
       if self._latest_tag_list is not None:
         self.tag_state.update(self._latest_tag_list).sort()
-      if event.last_real is not None:
-        self.tag_state.dock_age(rospy.Time.now() - event.last_real)
+      if time_since_last_step is not None:
+        self.tag_state.dock_age(time_since_last_step)
       for a_tag_report in self.tag_state.cube_tags:
         self.cube_report_pub.publish(
           CubeReport(
@@ -277,13 +300,19 @@ class RlBehavior(object):
       # ------------------------------------------------------------------------
       # Execute current action, should there be one.
       timestep_step = 'Action Execution'
-      action_result = None
+      action_response = None
       if self._current_action is not None:
-        action_result = self._current_action.update(
-          swarmie_state=self.swarmie_state
+        action_response = self._current_action.update(
+          swarmie_state=self.swarmie_state,
+          elapsed_time=time_since_last_step
         )
-      if action_result is not None:
-        self.drive_cmd_pub.publish(action_result)
+      if action_response is not None:
+        if action_response.skid:
+          self.drive_cmd_pub.publish(action_response.skid)
+        if action_response.wrist:
+          self.wrist_cmd_pub.publish(action_response.wrist)
+        if action_response.fingers:
+          self.fingers_cmd_pub.publish(action_response.fingers)
       else:
         self._current_action = None
         self.drive_cmd_pub.publish(Skid(left=0., right=0.))

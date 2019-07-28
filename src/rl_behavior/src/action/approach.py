@@ -5,6 +5,7 @@ import math
 import rospy
 from swarmie_msgs.msg import Skid
 from utility import PidLoop
+from . import ActionResponse
 
 class ApproachAction(object):
   CUBE_TARGET_DISTANCE = 0.25 # meters
@@ -21,7 +22,7 @@ class ApproachAction(object):
     self.vel_pid = None
     self.yaw_pid = None
   
-  def update(self, swarmie_state):
+  def update(self, swarmie_state, elapsed_time):
     if not self.tag_state.cube_tags:
       rospy.loginfo(
         '{} asked to approach non-existent cube.'.format(
@@ -88,7 +89,9 @@ class ApproachAction(object):
       right_cmd = vel_output + yaw_output
       right_cmd = min(ApproachAction.MAX_SKID_CMD, right_cmd)
       right_cmd = max(ApproachAction.MIN_SKID_CMD, right_cmd)
-      return Skid(left=left_cmd, right=right_cmd)
+      return ActionResponse(
+        skid=Skid(left=left_cmd, right=right_cmd)
+      )
     else:
       rospy.loginfo(
         '{} done with approach to cube.'.format(

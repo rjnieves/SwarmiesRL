@@ -7,6 +7,7 @@ import rospy
 from utility import PathPlanning
 from action import TurnAction, DriveAction
 from swarmie_msgs.msg import Skid
+from . import ActionResponse
 
 class MoveToCellAction(object):
   @staticmethod
@@ -46,7 +47,7 @@ class MoveToCellAction(object):
       self._current_sub_action is not None and
       isinstance(self._current_sub_action, DriveAction)
     )
-  def update(self, swarmie_state):
+  def update(self, swarmie_state, elapsed_time):
     swarmie_grid_pos = self.coord_xform.from_real_to_grid(
       swarmie_state.odom_global[0:2]
     )
@@ -120,8 +121,8 @@ class MoveToCellAction(object):
         )
         self._current_sub_action = DriveAction(self.swarmie_name)
     if self._current_sub_action is not None:
-      skid_cmd = self._current_sub_action.update(swarmie_state)
-      return skid_cmd or Skid(left=0., right=0.)
+      response = self._current_sub_action.update(swarmie_state, elapsed_time)
+      return response or ActionResponse(skid=Skid(left=0, right=0))
     else:
       self._policy = None
       self._current_sub_action = None

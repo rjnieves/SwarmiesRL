@@ -6,6 +6,7 @@ import numpy as np
 import rospy
 from swarmie_msgs.msg import Skid
 from utility import PidLoop
+from . import ActionResponse
 
 class TurnAction(object):
   MIN_SKID_CMD = -180.
@@ -20,7 +21,7 @@ class TurnAction(object):
     if abs_target_angle > 3.13 and abs_target_angle < 3.15:
       self.target_angle = abs_target_angle
 
-  def update(self, swarmie_state):
+  def update(self, swarmie_state, elapsed_time):
     yaw_current = swarmie_state.odom_current[2]
     abs_yaw_current = abs(yaw_current)
     if abs_yaw_current > 3.13 and abs_yaw_current < 3.15:
@@ -61,6 +62,8 @@ class TurnAction(object):
     right_cmd = 0. + yaw_output
     right_cmd = min(TurnAction.MAX_SKID_CMD, right_cmd)
     right_cmd = max(TurnAction.MIN_SKID_CMD, right_cmd)
-    return Skid(left=left_cmd, right=right_cmd)
+    return ActionResponse(
+      skid=Skid(left=left_cmd, right=right_cmd)
+    )
 
 # vim: set ts=2 sw=2 expandtab:
