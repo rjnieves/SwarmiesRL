@@ -55,10 +55,10 @@ class TagState(object):
         repr(self.base_link_coords)
       )
 
-  def __init__(self, swarmie_name, location_info, tf, coord_xform):
+  def __init__(self, swarmie_name, swarmie_state, tf, coord_xform):
     super(TagState, self).__init__()
     self.swarmie_name = swarmie_name
-    self.location_info = location_info
+    self.swarmie_state = swarmie_state
     self.coord_xform = coord_xform
     self.tf = tf
     self.reset()
@@ -127,7 +127,7 @@ class TagState(object):
               resulting_pose.pose.position.y,
               yaw
             )
-        tag_best_guess = self.location_info.local_odom_to_global(
+        tag_best_guess = self.swarmie_state.local_odom_to_global(
           (
             round(resulting_pose.pose.position.x, 1),
             round(resulting_pose.pose.position.y, 1),

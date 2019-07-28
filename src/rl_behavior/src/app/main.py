@@ -2,6 +2,7 @@ from __future__ import print_function
 import math
 import sys
 import traceback
+import re
 import numpy as np
 import rospy
 import message_filters
@@ -14,8 +15,8 @@ from nav_msgs.msg import Odometry
 from sensor_msgs.msg import Range, Joy
 from apriltags_ros.msg import AprilTagDetectionArray
 from swarmie_msgs.msg import Skid, CubeReport
-from world import CoordinateTransform
-from action import ApproachAction, TurnAction, DriveAction
+from world import CoordinateTransform, Arena
+from action import ApproachAction, TurnAction, DriveAction, MoveToCellAction
 from . import SwarmieState, TagState, PidLoop
 
 class RlBehavior(object):
@@ -47,8 +48,8 @@ class RlBehavior(object):
   ARENA_X_RANGE = (-7.5, 7.5)
   ARENA_Y_RANGE = (-7.5, 7.5)
   GRID_QUANTIZATION = (30, 30)
-  NEST_X_TOP_LEFT = (-2.0, 2.0)
-  NEST_DIMS = (4.0, 4.0)
+  NEST_X_TOP_LEFT = (-1.0, 1.0)
+  NEST_DIMS = (2.0, 2.0)
 
   def __init__(self, swarmie_name):
     self.swarmie_name = swarmie_name
@@ -60,6 +61,12 @@ class RlBehavior(object):
       RlBehavior.ARENA_X_RANGE,
       RlBehavior.ARENA_Y_RANGE,
       RlBehavior.GRID_QUANTIZATION
+    )
+    self.arena = Arena(
+      len(RlBehavior.NAME_TO_ID_MAP),
+      self.coord_xform,
+      RlBehavior.NEST_X_TOP_LEFT,
+      RlBehavior.NEST_DIMS
     )
     self.tag_state = None
     self._latest_tag_list = None
@@ -75,7 +82,7 @@ class RlBehavior(object):
     self.timestep_timer = None
     self.hb_timer = None
     # Subscribers --------------------------------------------------------------
-    self.map_sub = None
+    # self.map_sub = None
     self.odom_sub = None
     self.mode_sub = None
     self.sonar_left_sub = None
@@ -127,12 +134,12 @@ class RlBehavior(object):
     # --------------------------------------------------------------------------
     # Set up all the subscribers
     #
-    self.map_sub = rospy.Subscriber(
-      '{}/odom/ekf'.format(self.swarmie_name),
-      Odometry,
-      callback=self._on_map_update,
-      queue_size=10
-    )
+    # self.map_sub = rospy.Subscriber(
+    #   '{}/odom/ekf'.format(self.swarmie_name),
+    #   Odometry,
+    #   callback=self._on_map_update,
+    #   queue_size=10
+    # )
     self.odom_sub = rospy.Subscriber(
       '{}/odom/filtered'.format(self.swarmie_name),
       Odometry,
@@ -239,6 +246,19 @@ class RlBehavior(object):
             self.swarmie_state.odom_center[1]
           )
         )
+        if not self.initialized:
+          rospy.logfatal(
+            '{} failed initialization with {} {} {}'.format(
+              self.swarmie_name,
+              self.swarmie_state._positions_populated,
+              self.swarmie_state.linear_vel,
+              self.swarmie_state.angular_vel
+            )
+          )
+          self.hb_timer.shutdown()
+          self.status_timer.shutdown()
+          self.timestep_timer.shutdown()
+          rospy.signal_shutdown('Odometry data not available for {}'.format(self.swarmie_name))
       # ------------------------------------------------------------------------
       # Update tag information with latest message
       timestep_step = 'Tag Sightings Update'
@@ -285,99 +305,6 @@ class RlBehavior(object):
           ex.message
         )
       )
-    # --------------------------------------------------------------------------
-    # TEST CODE: Execute approach if asked to
-    # if self.approaching and self.tag_state.cube_tags:
-    #   closest_cube = self.tag_state.cube_tags[0]
-    #   rospy.loginfo(
-    #     '{} approaching cube at grid {}, base_link {}, {} meters off.'.format(
-    #       self.swarmie_name,
-    #       closest_cube.grid_coords,
-    #       closest_cube.base_link_coords,
-    #       closest_cube.tag_dist
-    #     )
-    #   )
-    #   if closest_cube.tag_dist > 0.23:
-    #     if self.vel_pid is None:
-    #       self.vel_pid = PidLoop(PidLoop.Config.make_slow_vel())
-    #     if self.yaw_pid is None:
-    #       self.yaw_pid = PidLoop(PidLoop.Config.make_slow_yaw())
-    #     vel_setpoint = closest_cube.tag_dist * 0.20
-    #     vel_setpoint = min(0.2, vel_setpoint)
-    #     vel_setpoint = max(0.1, vel_setpoint)
-    #     vel_error = vel_setpoint - self.linear_vel
-    #     rospy.loginfo(
-    #       '{} velocity set point is ({}), current is ({}), making an error of ({})'.format(
-    #         self.swarmie_name,
-    #         vel_setpoint,
-    #         self.linear_vel,
-    #         vel_error
-    #       )
-    #     )
-    #     yaw_setpoint = 0.
-    #     yaw_current = math.atan(
-    #       closest_cube.base_link_coords[1] / closest_cube.base_link_coords[0]
-    #     )
-    #     yaw_error = yaw_setpoint - yaw_current
-    #     rospy.loginfo(
-    #       '{} yaw set point is ({}), current is ({}), making an error of ({})'.format(
-    #         self.swarmie_name,
-    #         yaw_setpoint,
-    #         yaw_current,
-    #         yaw_error
-    #       )
-    #     )
-    #     vel_output = self.vel_pid.pid_out(vel_error, vel_setpoint)
-    #     # Negating the sign of the error since transverse y-axis positive
-    #     # direction is to the left.
-    #     yaw_output = self.yaw_pid.pid_out(-1. * yaw_error, yaw_setpoint)
-    #     rospy.loginfo(
-    #       '{} PID output for velocity ({}), yaw ({})'.format(
-    #         self.swarmie_name,
-    #         vel_output,
-    #         yaw_output
-    #       )
-    #     )
-    #     left_cmd = vel_output - yaw_output
-    #     left_cmd = min(180., left_cmd)
-    #     left_cmd = max(-180., left_cmd)
-    #     right_cmd = vel_output + yaw_output
-    #     right_cmd = min(180., right_cmd)
-    #     right_cmd = max(-180., right_cmd)
-    #     rospy.loginfo(
-    #       '{} PID left cmd ({}) right cmd ({})'.format(
-    #         self.swarmie_name,
-    #         left_cmd,
-    #         right_cmd
-    #       )
-    #     )
-    #     self.drive_cmd_pub.publish(
-    #       Skid(left=left_cmd, right=right_cmd)
-    #     )
-    #   else:
-    #     rospy.loginfo(
-    #       '{} done with approach to cube.'.format(
-    #         self.swarmie_name
-    #       )
-    #     )
-    #     self.vel_pid = None
-    #     self.yaw_pid = None
-    #     self.approaching = False
-    #     self.drive_cmd_pub.publish(
-    #       Skid(left=0., right=0.)
-    #     )
-    # elif self.approaching:
-    #   rospy.loginfo(
-    #     '{} asked to approach non-existent cube.'.format(
-    #       self.swarmie_name
-    #     )
-    #   )
-    #   self.approaching = False
-    #   self.vel_pid = None
-    #   self.yaw_pid = None
-    #   self.drive_cmd_pub.publish(
-    #     Skid(left=0., right=0.)
-    #   )
 
   def _on_odom_update(self, sample):
     """Position update callback.
@@ -407,31 +334,31 @@ class RlBehavior(object):
     self.swarmie_state.linear_vel = sample.twist.twist.linear.x
     self.swarmie_state.angular_vel = sample.twist.twist.angular.z
 
-  def _on_map_update(self, sample):
-    """Map-based position update callback.
+  # def _on_map_update(self, sample):
+  #   """Map-based position update callback.
 
-    Called by ROS whenever a sample arrives via the <swarmie>/odom/ekf topic,
-    communicating the currently-sensed position of the swarmie using a global
-    reference frame.
+  #   Called by ROS whenever a sample arrives via the <swarmie>/odom/ekf topic,
+  #   communicating the currently-sensed position of the swarmie using a global
+  #   reference frame.
 
-    :param sample: Odometry sample.
-    :type sample: nav_msgs.msg.Odometry
-    """
-    (_, _, yaw) = euler_from_quaternion(
-      (
-        sample.pose.pose.orientation.x,
-        sample.pose.pose.orientation.y,
-        sample.pose.pose.orientation.z,
-        sample.pose.pose.orientation.w
-      )
-    )
-    self.swarmie_state.map_current = np.array(
-      [
-        sample.pose.pose.position.x,
-        sample.pose.pose.position.y,
-        yaw
-      ]
-    )
+  #   :param sample: Odometry sample.
+  #   :type sample: nav_msgs.msg.Odometry
+  #   """
+  #   (_, _, yaw) = euler_from_quaternion(
+  #     (
+  #       sample.pose.pose.orientation.x,
+  #       sample.pose.pose.orientation.y,
+  #       sample.pose.pose.orientation.z,
+  #       sample.pose.pose.orientation.w
+  #     )
+  #   )
+  #   self.swarmie_state.map_current = np.array(
+  #     [
+  #       sample.pose.pose.position.x,
+  #       sample.pose.pose.position.y,
+  #       yaw
+  #     ]
+  #   )
 
   def _on_mode_change(self, sample):
     """Operating mode update callback.
@@ -545,7 +472,7 @@ class RlBehavior(object):
     elif cmd_str == 'turn_east':
       self._current_action = TurnAction(self.swarmie_name, 0.)
     elif cmd_str == 'turn_west':
-      self._current_action = TurnAction(self.swarmie_name, -1. * math.pi)
+      self._current_action = TurnAction(self.swarmie_name, math.pi)
     elif cmd_str == 'turn_north':
       self._current_action = TurnAction(self.swarmie_name, (math.pi / 2.))
     elif cmd_str == 'turn_south':
@@ -554,6 +481,13 @@ class RlBehavior(object):
       self._current_action = DriveAction(self.swarmie_name)
     elif cmd_str == 'drive_backward':
       self._current_action = DriveAction(self.swarmie_name, forward=False)
+    elif cmd_str.startswith('move_to'):
+      parsed_cmd = re.search(r'move_to\((?P<row>[0-9]+),(?P<col>[0-9]+)\)', cmd_str)
+      dest_coords = (
+        int(parsed_cmd.group('row')),
+        int(parsed_cmd.group('col')),
+      )
+      self._current_action = MoveToCellAction(self.swarmie_name, self.arena, dest_coords)
     elif cmd_str == 'halt':
       self._current_action = None
     else:

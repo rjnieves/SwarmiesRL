@@ -16,11 +16,24 @@ class TurnAction(object):
     self.swarmie_name = swarmie_name
     self.yaw_pid = None
     self.target_angle = target_angle
+    abs_target_angle = abs(self.target_angle)
+    if abs_target_angle > 3.13 and abs_target_angle < 3.15:
+      self.target_angle = abs_target_angle
 
   def update(self, swarmie_state):
     yaw_current = swarmie_state.odom_current[2]
+    abs_yaw_current = abs(yaw_current)
+    if abs_yaw_current > 3.13 and abs_yaw_current < 3.15:
+      # In that magic pi/-pi discontinuity, always stay positive
+      yaw_current = abs_yaw_current
     if np.isclose(yaw_current, self.target_angle, atol=1e-2):
-      rospy.loginfo('{} close enough to requested angle.'.format(self.swarmie_name))
+      rospy.loginfo(
+        '{} yaw {} close enough to requested angle {}'.format(
+          self.swarmie_name,
+          yaw_current,
+          self.target_angle
+        )
+      )
       return None
     if self.yaw_pid is None:
       self.yaw_pid = PidLoop(PidLoop.Config.make_turn_yaw())
@@ -36,7 +49,7 @@ class TurnAction(object):
       )
     )
     yaw_output = self.yaw_pid.pid_out(yaw_error, self.target_angle)
-    rospy.loginfo(
+    rospy.logdebug(
       '{} PID output for yaw ({})'.format(
         self.swarmie_name,
         yaw_output
