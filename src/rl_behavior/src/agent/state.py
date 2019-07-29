@@ -9,6 +9,7 @@ from events import (
   CubeSpottedEvent,
   CubePickedUpEvent,
   CubeCollectedEvent,
+  CubeDroppedEvent,
   NewCubeEvent
 )
 
@@ -22,6 +23,7 @@ class StateRepository(object):
     self.emitter.on_event(CubeSpottedEvent, self.cube_spotted)
     self.emitter.on_event(CubePickedUpEvent, self.cube_picked_up_by)
     self.emitter.on_event(CubeCollectedEvent, self.cube_collected)
+    self.emitter.on_event(CubeDroppedEvent, self.cube_dropped_by)
 
   @property
   def state_size(self):

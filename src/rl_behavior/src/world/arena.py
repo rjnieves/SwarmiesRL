@@ -2,6 +2,8 @@
 """
 
 import numpy as np
+from events import SwarmieLocEvent
+
 
 class Arena(object):
   """Model of the swarmie arena in grid form.
@@ -18,22 +20,29 @@ class Arena(object):
     swarmie_count,
     coord_xform,
     nest_real_tl,
-    nest_real_dims
+    nest_real_dims,
+    emitter
   ):
     """Primary constructor
 
     Parameters
     ----------
+    swarmie_count : int
+        Number of swarmie robots participating
     coord_xform : world.CoordinateTransform
         Coordinate transformation service
     nest_real_tl : tuple(float, float)
         Top-left of the nest in real coordinates.
     nest_real_dims : tuple(float, float)
         Nest size in real dimensions.
+    emitter : events.EventEmitter
+        Local event emitter
     """
     super(Arena, self).__init__()
     self.swarmie_count = int(swarmie_count)
     self.coord_xform = coord_xform
+    self.emitter = emitter
+    self.emitter.on(SwarmieLocEvent, self.swarmie_loc_update)
     self.grid_dims = (
       self.coord_xform.x_quant.axis_quant_dim,
       self.coord_xform.y_quant.axis_quant_dim
@@ -72,11 +81,18 @@ class Arena(object):
     """
     last_known_grid_loc = self._swarmie_grid_locs[loc_event.swarmie_id]
     swarmie_grid_loc = np.array(
-      self.coord_xform.from_real_to_grid(loc_event.swarmie_loc)
+      loc_event.swarmie_loc, dtype=np.int16
     )
-    if not np.all((last_known_grid_loc, swarmie_grid_loc)):
+    if not np.all(last_known_grid_loc == swarmie_grid_loc):
       # TODO: Flag location update event
       self._swarmie_grid_locs[loc_event.swarmie_id] = swarmie_grid_loc
+
+  def grid_cell_occupied(self, grid_coords):
+    result = False
+    grid_coords = np.array(grid_coords, dtype=np.int16)
+    for swarmie_grid_loc in self._swarmie_grid_locs[:]:
+      result = result or np.all(swarmie_grid_loc == grid_coords)
+    return result
 
   def build_planning_grid(self, include_nest=True):
     """Create 2-D representation of arena suitable for path planning.
@@ -116,8 +132,10 @@ class Arena(object):
 
 if __name__ == '__main__':
   from coordxform import CoordinateTransform
+  from events import EventEmitter
+  my_emitter = EventEmitter()
   my_xform = CoordinateTransform((-7.5, 7.5), (-7.5, 7.5), (30, 30,))
-  my_arena = Arena(3, my_xform, (-2.0, 2.0), (4.0, 4.0))
+  my_arena = Arena(3, my_xform, (-2.0, 2.0), (4.0, 4.0), my_emitter)
   from events import SwarmieLocEvent
   my_arena.swarmie_loc_update(
     SwarmieLocEvent(0, (-7.5, 7.5))

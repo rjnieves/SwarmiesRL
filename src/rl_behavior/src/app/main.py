@@ -14,9 +14,23 @@ from geometry_msgs.msg import Pose2D
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import Range, Joy
 from apriltags_ros.msg import AprilTagDetectionArray
-from swarmie_msgs.msg import Skid, CubeReport
+from swarmie_msgs.msg import Skid, GridReport
 from world import CoordinateTransform, Arena
-from action import ApproachAction, TurnAction, DriveAction, MoveToCellAction, PickupAction, DropOffAction, SweepAction, SearchAction
+from action import (
+  ApproachAction,
+  TurnAction,
+  DriveAction,
+  MoveToCellAction,
+  PickupAction,
+  DropOffAction,
+  SweepAction,
+  SearchAction
+)
+from events import (
+  EventEmitter,
+  CubeSpottedEvent,
+  SwarmieLocEvent
+)
 from . import SwarmieState, TagState
 
 class RlBehavior(object):
@@ -71,12 +85,14 @@ class RlBehavior(object):
     self.tag_state = None
     self._latest_tag_list = None
     self._current_action = None
+    self.emitter = EventEmitter()
     # Publishers ---------------------------------------------------------------
     self.status_pub = None
     self.hb_pub = None
     self.infolog_pub = None
     self.drive_cmd_pub = None
     self.cube_report_pub = None
+    self.pos_report_pub = None
     self.wrist_cmd_pub = None
     self.fingers_cmd_pub = None
     # Timers -------------------------------------------------------------------
@@ -94,6 +110,8 @@ class RlBehavior(object):
     self.joy_sub = None
     self.target_sub = None
     self.maint_cmd_sub = None
+    self.cube_report_sub = None
+    self.pos_report_sub = None
   
   def run(self):
     print('Welcome to the world of tomorrow {}!'.format(self.swarmie_name))
@@ -129,8 +147,13 @@ class RlBehavior(object):
       queue_size=10
     )
     self.cube_report_pub = rospy.Publisher(
-      '/aprilCubeReports',
-      CubeReport,
+      '/aprilCubeReport',
+      GridReport,
+      queue_size=10
+    )
+    self.pos_report_pub = rospy.Publisher(
+      '/positionReport',
+      GridReport,
       queue_size=10
     )
     self.wrist_cmd_pub = rospy.Publisher(
@@ -197,6 +220,18 @@ class RlBehavior(object):
       '{}/maintCmd'.format(self.swarmie_name),
       String,
       callback=self._on_maint_cmd,
+      queue_size=10
+    )
+    self.cube_report_sub = rospy.Subscriber(
+      '/aprilCubeReport',
+      GridReport,
+      callback=self._on_april_cube_report,
+      queue_size=10
+    )
+    self.pos_report_sub = rospy.Subscriber(
+      '/positionReport',
+      GridReport,
+      callback=self._on_swarmie_pos_report,
       queue_size=10
     )
     # --------------------------------------------------------------------------
@@ -291,7 +326,7 @@ class RlBehavior(object):
         self.tag_state.dock_age(time_since_last_step)
       for a_tag_report in self.tag_state.cube_tags:
         self.cube_report_pub.publish(
-          CubeReport(
+          GridReport(
             grid_x=a_tag_report.grid_coords[0],
             grid_y=a_tag_report.grid_coords[1],
             swarmie_id=self.swarmie_id
@@ -359,6 +394,13 @@ class RlBehavior(object):
         sample.pose.pose.position.y,
         yaw
       ]
+    )
+    self.pos_report_pub.publish(
+      GridReport(
+        grid_x=self.swarmie_state.odom_global[0],
+        grid_y=self.swarmie_state.odom_global[1],
+        swarmie_id=self.swarmie_id
+      )
     )
     self.swarmie_state.linear_vel = sample.twist.twist.linear.x
     self.swarmie_state.angular_vel = sample.twist.twist.angular.z
@@ -493,6 +535,22 @@ class RlBehavior(object):
     :type tag_list: apriltags_ros.msg.AprilTagDetectionArray
     """
     self._latest_tag_list = tag_list
+
+  def _on_april_cube_report(self, the_report):
+    self.emitter.emit(
+      CubeSpottedEvent(
+        cube_loc=(the_report.grid_x, the_report.grid_y),
+        swarmie_id=the_report.swarmie_id
+      )
+    )
+
+  def _on_swarmie_pos_report(self, the_report):
+    self.emitter.emit(
+      SwarmieLocEvent(
+        swarmie_loc=(the_report.grid_x, the_report.grid_y),
+        swarmie_id=the_report.swarmie_id
+      )
+    )
 
   def _on_maint_cmd(self, the_cmd):
     cmd_str = str(the_cmd.data).lower()
