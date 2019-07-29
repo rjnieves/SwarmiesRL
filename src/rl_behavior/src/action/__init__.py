@@ -12,5 +12,6 @@ from .approach import ApproachAction
 from .pickup import PickupAction
 from .dropoff import DropOffAction
 from .search import SearchAction
+from .fetch import FetchAction
 
 # vim: set ts=2 sw=2 expandtab:
