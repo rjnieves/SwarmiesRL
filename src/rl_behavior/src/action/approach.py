@@ -8,7 +8,7 @@ from utility import PidLoop
 from . import ActionResponse
 
 class ApproachAction(object):
-  CUBE_TARGET_DISTANCE = 0.25 # meters
+  CUBE_TARGET_DISTANCE = 0.20 # meters
   DIST_TO_VEL_KP = 0.2 # kP for simple distance to velocity P-loop
   MAX_APPROACH_VEL = 0.2 # meters/s
   MIN_APPROACH_VEL = 0.1 # meters/s

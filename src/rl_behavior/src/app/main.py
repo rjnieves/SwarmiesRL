@@ -16,7 +16,7 @@ from sensor_msgs.msg import Range, Joy
 from apriltags_ros.msg import AprilTagDetectionArray
 from swarmie_msgs.msg import Skid, CubeReport
 from world import CoordinateTransform, Arena
-from action import ApproachAction, TurnAction, DriveAction, MoveToCellAction, PickupAction, DropOffAction
+from action import ApproachAction, TurnAction, DriveAction, MoveToCellAction, PickupAction, DropOffAction, SweepAction
 from . import SwarmieState, TagState
 
 class RlBehavior(object):
@@ -521,6 +521,8 @@ class RlBehavior(object):
       self._current_action = PickupAction(self.swarmie_name)
     elif cmd_str == 'drop_off':
       self._current_action = DropOffAction(self.swarmie_name)
+    elif cmd_str == 'sweep':
+      self._current_action = SweepAction(self.swarmie_name, self.tag_state)
     elif cmd_str == 'halt':
       self._current_action = None
     else:

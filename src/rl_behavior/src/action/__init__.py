@@ -4,6 +4,7 @@
 from .response import ActionResponse
 from .turn import TurnAction
 from .drive import DriveAction
+from .sweep import SweepAction
 from .moveto import MoveToCellAction
 from .clawwrist import ClawWristAction
 from .clawfingers import ClawFingersAction

@@ -1,6 +1,7 @@
 """Amalgamation for the utility package.
 """
 
+from .yaw import yaw_wrap, vectorized_yaw_wrap
 from .pid import PidLoop
 from .pathplan import PathPlanning
 

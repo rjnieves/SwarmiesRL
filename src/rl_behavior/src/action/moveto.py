@@ -40,7 +40,7 @@ class MoveToCellAction(object):
     return (
       self._current_sub_action is not None and
       isinstance(self._current_sub_action, TurnAction) and
-      np.isclose(self._current_sub_action.target_angle, yaw_angle, atol=1e-2)
+      np.isclose(self._current_sub_action.target_angle, yaw_angle, atol=2e-2)
     )
 
   def _already_driving(self):
@@ -94,7 +94,7 @@ class MoveToCellAction(object):
       self._policy = None
       self._current_sub_action = None
       return None
-    if not np.isclose(next_yaw, swarmie_yaw, atol=1e-2):
+    if not np.isclose(next_yaw, swarmie_yaw, atol=2e-2):
       # Need to turn
       if not self._already_turning_to(next_yaw):
         rospy.loginfo(
