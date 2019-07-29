@@ -3,6 +3,7 @@
 
 import heapq
 import numpy as np
+import rospy
 from scipy.spatial import distance
 
 class PathPlanning(object):
@@ -20,6 +21,15 @@ class PathPlanning(object):
     self._planning_grid = self.arena.build_planning_grid(
       include_nest=nest_as_obstacle
     )
+    from_grid = tuple(from_grid)
+    to_grid = tuple(to_grid)
+    if self._planning_grid[to_grid]:
+      rospy.logwarn(
+        'PathPlanning asked to plan path to obstacle at {}. Abort.'.format(
+          to_grid
+        )
+      )
+      return [(None, from_grid),]
     matrix_path = self._path_search(from_grid, to_grid)
     return matrix_path
 
