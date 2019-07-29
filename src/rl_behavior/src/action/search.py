@@ -36,12 +36,12 @@ class SearchAction(object):
       self._quadrant_tl = np.array([0, 0])
       self._quadrant_br = np.array([
         self.arena.nest_grid_br[0],
-        self.arena.nest_grid_tl[1]
+        self.arena.nest_grid_tl[1] - 1
       ])
       self._build_seq_col_primary()
     elif self.quadrant == SearchAction.BRAVO_QUADRANT:
       self._quadrant_tl = np.array([
-        self.arena.nest_grid_br[0],
+        self.arena.nest_grid_br[0] + 1,
         0
       ])
       self._quadrant_br = np.array([
@@ -52,7 +52,7 @@ class SearchAction(object):
     elif self.quadrant == SearchAction.CHARLIE_QUADRANT:
       self._quadrant_tl = np.array([
         self.arena.nest_grid_tl[0],
-        self.arena.nest_grid_br[1]
+        self.arena.nest_grid_br[1] + 1
       ])
       self._quadrant_br = np.array([
         self.arena.grid_dims[0] - 1,

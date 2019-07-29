@@ -61,8 +61,11 @@ class SweepAction(object):
         'SweepAction completely done'
       )
     else:
-      # TODO: look for visible tags, and stop if we see one
-      pass
+      if self.tag_state.cube_tags:
+        rospy.loginfo(
+          'SweepAction found a block!'
+        )
+        next_response = None
     return next_response
 
 # vim: set ts=2 sw=2 expandtab:
