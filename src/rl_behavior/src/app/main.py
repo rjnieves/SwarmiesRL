@@ -16,7 +16,7 @@ from sensor_msgs.msg import Range, Joy
 from apriltags_ros.msg import AprilTagDetectionArray
 from swarmie_msgs.msg import Skid, CubeReport
 from world import CoordinateTransform, Arena
-from action import ApproachAction, TurnAction, DriveAction, MoveToCellAction, PickupAction, DropOffAction, SweepAction
+from action import ApproachAction, TurnAction, DriveAction, MoveToCellAction, PickupAction, DropOffAction, SweepAction, SearchAction
 from . import SwarmieState, TagState
 
 class RlBehavior(object):
@@ -45,11 +45,11 @@ class RlBehavior(object):
   JOYSTICK_ANGULAR_AXIS = 3
   MAX_MOTOR_CMD = 255.0
   INIT_PLACE_RADIUS = 1.3
-  ARENA_X_RANGE = (-7.5, 7.5)
-  ARENA_Y_RANGE = (-7.5, 7.5)
+  ARENA_X_RANGE = (-7.4, 7.4)
+  ARENA_Y_RANGE = (-7.4, 7.4)
   GRID_QUANTIZATION = (30, 30)
-  NEST_X_TOP_LEFT = (-1.0, 1.0)
-  NEST_DIMS = (2.0, 2.0)
+  NEST_X_TOP_LEFT = (-0.5, 0.5)
+  NEST_DIMS = (1.0, 1.0)
 
   def __init__(self, swarmie_name):
     self.swarmie_name = swarmie_name
@@ -523,6 +523,10 @@ class RlBehavior(object):
       self._current_action = DropOffAction(self.swarmie_name)
     elif cmd_str == 'sweep':
       self._current_action = SweepAction(self.swarmie_name, self.tag_state)
+    elif cmd_str.startswith('search'):
+      parsed_cmd = re.search(r'search\((?P<quad>[a-z]+)\)', cmd_str)
+      quad = parsed_cmd.group('quad')
+      self._current_action = SearchAction(self.swarmie_name, self.arena, quad)
     elif cmd_str == 'halt':
       self._current_action = None
     else:

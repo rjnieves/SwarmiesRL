@@ -111,15 +111,16 @@ if __name__ == '__main__':
   from world import Arena, CoordinateTransform
   from events import SwarmieLocEvent
   coord_xform = CoordinateTransform((-7.5, 7.5), (-7.5, 7.5), (30, 30,))
-  arena = Arena(1, coord_xform, (-2.0, 2.0), (4.0, 4.0))
-  swarmie_loc_evt = SwarmieLocEvent(0, (-7.5, 7.5))
+  arena = Arena(1, coord_xform, (-1.0, 1.0), (2.0, 2.0))
+  swarmie_loc_evt = SwarmieLocEvent(0, (-1.25, 0.))
   arena.swarmie_loc_update(swarmie_loc_evt)
   planning_grid = arena.build_planning_grid()
   print '{}'.format(arena.grid_to_str(planning_grid))
   planner = PathPlanning(arena)
   the_plan = planner.calculate_path(
-    coord_xform.from_real_to_grid(swarmie_loc_evt.swarmie_loc),
-    coord_xform.from_real_to_grid((3.0, -2.5))
+    (11,14), (0, 0)
+    # coord_xform.from_real_to_grid(swarmie_loc_evt.swarmie_loc),
+    # coord_xform.from_real_to_grid((-7.5, 7.5))
   )
   print '{}'.format(the_plan)
 

@@ -19,17 +19,18 @@ class TurnAction(object):
     self.target_angle = target_angle
     self.min_skid = min_skid if min_skid is not None else TurnAction.MIN_SKID_CMD
     self.max_skid = max_skid if max_skid is not None else TurnAction.MAX_SKID_CMD
-    abs_target_angle = abs(self.target_angle)
-    if abs_target_angle > 3.13 and abs_target_angle < 3.15:
-      self.target_angle = abs_target_angle
+    # abs_target_angle = abs(self.target_angle)
+    # if abs_target_angle > 3.13 and abs_target_angle < 3.15:
+    #   self.target_angle = abs_target_angle
 
   def update(self, swarmie_state, elapsed_time):
     yaw_current = swarmie_state.odom_current[2]
-    abs_yaw_current = abs(yaw_current)
-    if abs_yaw_current > 3.13 and abs_yaw_current < 3.15:
-      # In that magic pi/-pi discontinuity, always stay positive
-      yaw_current = abs_yaw_current
-    if np.isclose(yaw_current, self.target_angle, atol=2e-2):
+    # abs_yaw_current = abs(yaw_current)
+    # if abs_yaw_current > 3.13 and abs_yaw_current < 3.15:
+    #   # In that magic pi/-pi discontinuity, always stay positive
+    #   yaw_current = abs_yaw_current
+    yaw_diff = yaw_wrap(self.target_angle - yaw_current)
+    if np.isclose(yaw_diff, 0., atol=2e-2):
       rospy.loginfo(
         '{} yaw {} close enough to requested angle {}'.format(
           self.swarmie_name,

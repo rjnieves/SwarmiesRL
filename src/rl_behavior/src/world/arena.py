@@ -54,12 +54,12 @@ class Arena(object):
       self.grid_dims,
       dtype=np.bool
     )
-    nest_matrix_tl = coord_xform.from_real_to_grid(self.nest_real_tl)
-    nest_matrix_br = coord_xform.from_real_to_grid(self.nest_real_br)
+    self.nest_grid_tl = coord_xform.from_real_to_grid(self.nest_real_tl)
+    self.nest_grid_br = coord_xform.from_real_to_grid(self.nest_real_br)
     # from_grid_to_matrix_pos() returns row,col coordinate pairs
     self._nest_mask[
-      nest_matrix_tl[0]:nest_matrix_br[0],
-      nest_matrix_tl[1]:nest_matrix_br[1]
+      self.nest_grid_tl[0]:self.nest_grid_br[0],
+      self.nest_grid_tl[1]:self.nest_grid_br[1]
     ] = True
 
   def swarmie_loc_update(self, loc_event):
@@ -85,8 +85,8 @@ class Arena(object):
       self.grid_dims,
       dtype=np.bool
     )
-    for a_swarmie_loc in self._swarmie_grid_locs[:]:
-      result[a_swarmie_loc[1], a_swarmie_loc[0]] = True
+    # for a_swarmie_loc in self._swarmie_grid_locs[:]:
+    #   result[a_swarmie_loc[1], a_swarmie_loc[0]] = True
     if include_nest:
       np.logical_or(result, self._nest_mask, out=result)
     return result

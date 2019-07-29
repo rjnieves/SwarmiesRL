@@ -7,23 +7,29 @@ import rospy
 from utility import PathPlanning
 from action import TurnAction, DriveAction
 from swarmie_msgs.msg import Skid
+from utility import YawBearing, yaw_wrap
 from . import ActionResponse
 
 class MoveToCellAction(object):
   @staticmethod
   def convert_policy_move_to_yaw(policy_move):
     if policy_move == (1, 0):
-      return 0.
+      # return 0.
+      return YawBearing.EAST
     elif policy_move == (-1, 0):
-      return math.pi
+      # return math.pi
+      return YawBearing.WEST
     elif policy_move == (0, 1):
-      return -1. * (math.pi / 2.)
+      # return -1. * (math.pi / 2.)
+      return YawBearing.SOUTH
     elif policy_move == (0, -1):
-      return math.pi / 2.
+      # return math.pi / 2.
+      return YawBearing.NORTH
 
   def __init__(self, swarmie_name, arena, dest_coords):
     super(MoveToCellAction, self).__init__()
     self.swarmie_name = swarmie_name
+    self.arena = arena
     self.dest_coords = np.array(dest_coords, dtype=np.int16)
     if (
       np.any(np.greater_equal(self.dest_coords, arena.grid_dims)) or
@@ -37,29 +43,36 @@ class MoveToCellAction(object):
     self._avoid_nest = not arena.grid_loc_in_nest(dest_coords)
   
   def _already_turning_to(self, yaw_angle):
-    return (
+    result = (
       self._current_sub_action is not None and
-      isinstance(self._current_sub_action, TurnAction) and
-      np.isclose(self._current_sub_action.target_angle, yaw_angle, atol=2e-2)
+      isinstance(self._current_sub_action, TurnAction)
     )
+    if result:
+      yaw_diff = yaw_wrap(self._current_sub_action.target_angle - yaw_angle)
+      result = result and np.isclose(yaw_diff, 0., atol=2e-2)
+    return result
 
   def _already_driving(self):
     return (
       self._current_sub_action is not None and
       isinstance(self._current_sub_action, DriveAction)
     )
+
   def update(self, swarmie_state, elapsed_time):
     swarmie_grid_pos = self.coord_xform.from_real_to_grid(
       swarmie_state.odom_global[0:2]
     )
     swarmie_yaw = swarmie_state.odom_current[2]
-    abs_swarmie_yaw = abs(swarmie_yaw)
-    if abs_swarmie_yaw > 3.13 and abs_swarmie_yaw < 3.15:
-      swarmie_yaw = abs_swarmie_yaw
+    # abs_swarmie_yaw = abs(swarmie_yaw)
+    # if abs_swarmie_yaw > 3.13 and abs_swarmie_yaw < 3.15:
+    #   swarmie_yaw = abs_swarmie_yaw
     if self._policy is None:
       self._policy = self.path_planner.calculate_path(
-        swarmie_grid_pos, self.dest_coords, nest_as_obstacle=self._avoid_nest
+        swarmie_grid_pos,
+        tuple(self.dest_coords),
+        nest_as_obstacle=self._avoid_nest
       )
+      rospy.loginfo('Planning grid:\n{}'.format(self.arena.grid_to_str(self.path_planner._planning_grid)))
       rospy.loginfo(
         '{} created new path plan from {} to {}: {}'.format(
           self.swarmie_name,
@@ -94,7 +107,8 @@ class MoveToCellAction(object):
       self._policy = None
       self._current_sub_action = None
       return None
-    if not np.isclose(next_yaw, swarmie_yaw, atol=2e-2):
+    yaw_diff = yaw_wrap(next_yaw - swarmie_yaw)
+    if not np.isclose(yaw_diff, 0., atol=2e-2):
       # Need to turn
       if not self._already_turning_to(next_yaw):
         rospy.loginfo(
@@ -128,5 +142,8 @@ class MoveToCellAction(object):
       self._policy = None
       self._current_sub_action = None
       return None
+
+  def __str__(self):
+    return 'move_to({})'.format(self.dest_coords)
 
 # vim: set ts=2 sw=2 expandtab:
