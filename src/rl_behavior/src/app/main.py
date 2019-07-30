@@ -25,7 +25,8 @@ from action import (
   DropOffAction,
   SweepAction,
   SearchAction,
-  FetchAction
+  FetchAction,
+  MoveToRealAction
 )
 from events import (
   EventEmitter,
@@ -579,13 +580,20 @@ class RlBehavior(object):
       self._current_action = DriveAction(self.swarmie_name)
     elif cmd_str == 'drive_backward':
       self._current_action = DriveAction(self.swarmie_name, forward=False)
-    elif cmd_str.startswith('move_to'):
-      parsed_cmd = re.search(r'move_to\((?P<row>[0-9]+),(?P<col>[0-9]+)\)', cmd_str)
+    elif cmd_str.startswith('move_to_cell'):
+      parsed_cmd = re.search(r'move_to_cell\((?P<row>[0-9]+),(?P<col>[0-9]+)\)', cmd_str)
       dest_coords = (
         int(parsed_cmd.group('row')),
         int(parsed_cmd.group('col')),
       )
       self._current_action = MoveToCellAction(self.swarmie_name, self.arena, dest_coords)
+    elif cmd_str.startswith('move_to_real'):
+      parsed_cmd = re.search(r'move_to_real\((?P<x>\-?[0-9]+(\.[0-9]+)?),(?P<y>\-?[0-9]+(\.[0-9]+)?)\)', cmd_str)
+      dest_coords = (
+        float(parsed_cmd.group('x')),
+        float(parsed_cmd.group('y')),
+      )
+      self._current_action = MoveToRealAction(self.swarmie_name, dest_coords)
     elif cmd_str == 'pickup':
       self._current_action = PickupAction(self.swarmie_name)
     elif cmd_str == 'drop_off':
@@ -603,6 +611,8 @@ class RlBehavior(object):
         int(parsed_cmd.group('col')),
       )
       self._current_action = FetchAction(self.swarmie_name, self.arena, dest_coords, self.tag_state)
+    elif cmd_str == 'nest':
+      self._current_action = MoveToRealAction(self.swarmie_name, (0.0, 0.0))
     elif cmd_str == 'halt':
       self._current_action = None
     else:
