@@ -24,7 +24,8 @@ from action import (
   PickupAction,
   DropOffAction,
   SweepAction,
-  SearchAction
+  SearchAction,
+  FetchAction
 )
 from events import (
   EventEmitter,
@@ -68,6 +69,7 @@ class RlBehavior(object):
   def __init__(self, swarmie_name):
     self.swarmie_name = swarmie_name
     self.swarmie_id = RlBehavior.NAME_TO_ID_MAP.index(swarmie_name)
+    self.emitter = EventEmitter()
     self.swarmie_state = SwarmieState(self.swarmie_name)
     self.mode = RlBehavior.MANUAL_MODE
     self.tf = None
@@ -80,12 +82,12 @@ class RlBehavior(object):
       len(RlBehavior.NAME_TO_ID_MAP),
       self.coord_xform,
       RlBehavior.NEST_X_TOP_LEFT,
-      RlBehavior.NEST_DIMS
+      RlBehavior.NEST_DIMS,
+      self.emitter
     )
     self.tag_state = None
     self._latest_tag_list = None
     self._current_action = None
-    self.emitter = EventEmitter()
     # Publishers ---------------------------------------------------------------
     self.status_pub = None
     self.hb_pub = None
@@ -395,13 +397,17 @@ class RlBehavior(object):
         yaw
       ]
     )
-    self.pos_report_pub.publish(
-      GridReport(
-        grid_x=self.swarmie_state.odom_global[0],
-        grid_y=self.swarmie_state.odom_global[1],
-        swarmie_id=self.swarmie_id
+    if self.initialized:
+      grid_coords = self.coord_xform.from_real_to_grid(
+        self.swarmie_state.odom_global[0:2]
       )
-    )
+      self.pos_report_pub.publish(
+        GridReport(
+          grid_x=grid_coords[0],
+          grid_y=grid_coords[1],
+          swarmie_id=self.swarmie_id
+        )
+      )
     self.swarmie_state.linear_vel = sample.twist.twist.linear.x
     self.swarmie_state.angular_vel = sample.twist.twist.angular.z
 
@@ -585,6 +591,13 @@ class RlBehavior(object):
       parsed_cmd = re.search(r'search\((?P<quad>[a-z]+)\)', cmd_str)
       quad = parsed_cmd.group('quad')
       self._current_action = SearchAction(self.swarmie_name, self.arena, quad)
+    elif cmd_str.startswith('fetch'):
+      parsed_cmd = re.search(r'fetch\((?P<row>[0-9]+),(?P<col>[0-9]+)\)', cmd_str)
+      dest_coords = (
+        int(parsed_cmd.group('row')),
+        int(parsed_cmd.group('col')),
+      )
+      self._current_action = FetchAction(self.swarmie_name, self.arena, dest_coords, self.tag_state)
     elif cmd_str == 'halt':
       self._current_action = None
     else:

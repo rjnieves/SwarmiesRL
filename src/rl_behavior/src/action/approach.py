@@ -8,7 +8,7 @@ from utility import PidLoop
 from . import ActionResponse
 
 class ApproachAction(object):
-  CUBE_TARGET_DISTANCE = 0.20 # meters
+  CUBE_TARGET_DISTANCE = 0.22 # meters
   DIST_TO_VEL_KP = 0.2 # kP for simple distance to velocity P-loop
   MAX_APPROACH_VEL = 0.2 # meters/s
   MIN_APPROACH_VEL = 0.1 # meters/s
@@ -21,6 +21,7 @@ class ApproachAction(object):
     self.tag_state = tag_state
     self.vel_pid = None
     self.yaw_pid = None
+    self.target_acquired = False
   
   def update(self, swarmie_state, elapsed_time):
     if not self.tag_state.cube_tags:
@@ -32,7 +33,7 @@ class ApproachAction(object):
       self.vel_pid = None
       self.yaw_pid = None
       return None
-
+    self.target_acquired = True
     closest_cube = self.tag_state.cube_tags[0]
     rospy.loginfo(
       '{} approaching cube at grid {}, base_link {}, {} meters off.'.format(

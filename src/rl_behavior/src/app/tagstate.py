@@ -34,7 +34,7 @@ class TagState(object):
       self.grid_coords = tuple(grid_coords)
       self.base_link_coords = tuple(base_link_coords)
       self.tag_dist = distance.euclidean((0., 0.), self.base_link_coords[0:2])
-      self.age = rospy.Duration(1, 500000000)
+      self.age = rospy.Duration(1, 400000000)
     
     def dock_age(self, by_amt):
       self.age -= min(self.age, by_amt)

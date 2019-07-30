@@ -42,7 +42,7 @@ class Arena(object):
     self.swarmie_count = int(swarmie_count)
     self.coord_xform = coord_xform
     self.emitter = emitter
-    self.emitter.on(SwarmieLocEvent, self.swarmie_loc_update)
+    self.emitter.on_event(SwarmieLocEvent, self.swarmie_loc_update)
     self.grid_dims = (
       self.coord_xform.x_quant.axis_quant_dim,
       self.coord_xform.y_quant.axis_quant_dim
