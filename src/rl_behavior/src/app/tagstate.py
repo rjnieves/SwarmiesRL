@@ -9,6 +9,8 @@ from tf.transformations import euler_from_quaternion
 
 class TagState(object):
   class Report(object):
+    MAXIMUM_AGE = rospy.Duration(1, 400000000)
+
     @classmethod
     def sort_key(cls, instance):
       return instance.tag_dist
@@ -34,14 +36,22 @@ class TagState(object):
       self.grid_coords = tuple(grid_coords)
       self.base_link_coords = tuple(base_link_coords)
       self.tag_dist = distance.euclidean((0., 0.), self.base_link_coords[0:2])
-      self.age = rospy.Duration(1, 400000000)
+      self._age_countdown = TagState.Report.MAXIMUM_AGE
     
     def dock_age(self, by_amt):
-      self.age -= min(self.age, by_amt)
+      self._age_countdown -= min(self._age_countdown, by_amt)
 
     @property
     def alive(self):
-      return bool(self.age)
+      return bool(self._age_countdown)
+    
+    @property
+    def is_new(self):
+      return self._age_countdown == TagState.Report.MAXIMUM_AGE
+
+    @property
+    def age(self):
+      return TagState.Report.MAXIMUM_AGE - self._age_countdown
 
     def __repr__(self):
       return (

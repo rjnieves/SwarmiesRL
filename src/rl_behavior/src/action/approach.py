@@ -8,7 +8,7 @@ from utility import PidLoop
 from . import ActionResponse
 
 class ApproachAction(object):
-  CUBE_TARGET_DISTANCE = 0.22 # meters
+  CUBE_TARGET_DISTANCE = 0.20 # meters
   DIST_TO_VEL_KP = 0.2 # kP for simple distance to velocity P-loop
   MAX_APPROACH_VEL = 0.2 # meters/s
   MIN_APPROACH_VEL = 0.1 # meters/s
@@ -35,20 +35,23 @@ class ApproachAction(object):
       return None
     self.target_acquired = True
     closest_cube = self.tag_state.cube_tags[0]
+    cube_dist = closest_cube.tag_dist
+    if not closest_cube.is_new:
+      cube_dist -= swarmie_state.linear_vel * closest_cube.age.to_sec()
     rospy.loginfo(
       '{} approaching cube at grid {}, base_link {}, {} meters off.'.format(
         self.swarmie_name,
         closest_cube.grid_coords,
         closest_cube.base_link_coords,
-        closest_cube.tag_dist
+        cube_dist
       )
     )
-    if closest_cube.tag_dist > ApproachAction.CUBE_TARGET_DISTANCE:
+    if cube_dist > ApproachAction.CUBE_TARGET_DISTANCE:
       if self.vel_pid is None:
         self.vel_pid = PidLoop(PidLoop.Config.make_slow_vel())
       if self.yaw_pid is None:
         self.yaw_pid = PidLoop(PidLoop.Config.make_slow_yaw())
-      vel_setpoint = closest_cube.tag_dist * ApproachAction.DIST_TO_VEL_KP
+      vel_setpoint = cube_dist * ApproachAction.DIST_TO_VEL_KP
       vel_setpoint = min(ApproachAction.MAX_APPROACH_VEL, vel_setpoint)
       vel_setpoint = max(ApproachAction.MIN_APPROACH_VEL, vel_setpoint)
       vel_error = vel_setpoint - swarmie_state.linear_vel

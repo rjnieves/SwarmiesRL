@@ -65,6 +65,7 @@ class RlBehavior(object):
   GRID_QUANTIZATION = (30, 30)
   NEST_X_TOP_LEFT = (-0.5, 0.5)
   NEST_DIMS = (1.0, 1.0)
+  CUBE_ANNOUNCE_THRESHOLD = 0.25 # meters
 
   def __init__(self, swarmie_name):
     self.swarmie_name = swarmie_name
@@ -324,16 +325,15 @@ class RlBehavior(object):
       timestep_step = 'Tag Sightings Update'
       if self._latest_tag_list is not None:
         self.tag_state.update(self._latest_tag_list).sort()
-      if time_since_last_step is not None:
-        self.tag_state.dock_age(time_since_last_step)
       for a_tag_report in self.tag_state.cube_tags:
-        self.cube_report_pub.publish(
-          GridReport(
-            grid_x=a_tag_report.grid_coords[0],
-            grid_y=a_tag_report.grid_coords[1],
-            swarmie_id=self.swarmie_id
+        if a_tag_report.tag_dist > RlBehavior.CUBE_ANNOUNCE_THRESHOLD:
+          self.cube_report_pub.publish(
+            GridReport(
+              grid_x=a_tag_report.grid_coords[0],
+              grid_y=a_tag_report.grid_coords[1],
+              swarmie_id=self.swarmie_id
+            )
           )
-        )
       # ------------------------------------------------------------------------
       # Execute current action, should there be one.
       timestep_step = 'Action Execution'
@@ -353,6 +353,11 @@ class RlBehavior(object):
       else:
         self._current_action = None
         self.drive_cmd_pub.publish(Skid(left=0., right=0.))
+      # ------------------------------------------------------------------------
+      # Age the april tag sightings based on elapsed time
+      timestep_step = 'April Tag Sighting Age'
+      if time_since_last_step is not None:
+        self.tag_state.dock_age(time_since_last_step)
     except Exception as ex:
       ex_info = sys.exc_info()
       file_name = '<unknown>'

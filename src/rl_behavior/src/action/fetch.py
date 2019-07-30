@@ -30,21 +30,17 @@ class FetchAction(object):
         self._current_state = FetchAction.APPROACHING_TARGET_STATE
         rospy.loginfo('FetchAction MOVE_TO_TARGET_STATE -> APPROACHING_TARGET_STATE')
         self._current_action = ApproachAction(self.swarmie_name, self.tag_state)
-        # return self._current_action.update(swarmie_state, elapsed_time)
       else:
         self._current_state = FetchAction.SWEEPING_SITE_STATE
         rospy.loginfo('FetchAction MOVE_TO_TARGET_STATE -> SWEEPING_SITE_STATE')
         self._current_action = SweepAction(self.swarmie_name, self.tag_state)
-        # return self._current_action.update(swarmie_state, elapsed_time)
     elif self._current_state == FetchAction.MOVE_TO_NEST_STATE:
       self._current_state = FetchAction.DROP_OFF_TARGET_STATE
       rospy.loginfo('FetchAction MOVE_TO_NEST_STATE -> DROP_OFF_TARGET_STATE')
       self._current_action = DropOffAction(self.swarmie_name)
-      # return self._current_action.update(swarmie_state, elapsed_time)
     else:
       rospy.logwarn('FetchAction move_complete_event in {} state? Abort FetchAction'.format(self._current_state))
       self._current_state = FetchAction.DONE_STATE
-    #   return None
 
   def _sweep_complete_event(self, swarmie_state, elapsed_time):
     tag_spotted = bool(self.tag_state.cube_tags)
@@ -53,26 +49,21 @@ class FetchAction(object):
         self._current_state = FetchAction.APPROACHING_TARGET_STATE
         rospy.loginfo('FetchAction SWEEPING_SITE_STATE -> APPROACHING_TARGET_STATE')
         self._current_action = ApproachAction(self.swarmie_name, self.tag_state)
-        # return self._current_action.update(swarmie_state, elapsed_time)
       else:
         rospy.loginfo('FetchAction SWEEPING_SITE_STATE -> DONE_STATE')
         self._current_state = FetchAction.DONE_STATE
-        # return None
     else:
       rospy.logwarn('FetchAction sweep_complete_event in {} state? Abort FetchAction'.format(self._current_state))
       self._current_state = FetchAction.DONE_STATE
-    #   return None
 
   def _approach_complete_event(self, swarmie_state, elapsed_time):
     if self._current_state == FetchAction.APPROACHING_TARGET_STATE:
       self._current_state = FetchAction.PICKING_UP_TARGET_STATE
       rospy.loginfo('FetchAction APPROACHING_TARGET_STATE -> PICKING_UP_TARGET_STATE')
       self._current_action = PickupAction(self.swarmie_name)
-      # return self._current_action.update(swarmie_state, elapsed_time)
     else:
       rospy.logwarn('FetchAction approach_complete_event in {} state? Abort FetchAction'.format(self._current_state))
       self._current_state = FetchAction.DONE_STATE
-    #   return None
 
   def _approach_failed_event(self, swarmie_state, elapsed_time):
     if self._current_state == FetchAction.APPROACHING_TARGET_STATE:
@@ -83,20 +74,24 @@ class FetchAction(object):
 
   def _pickup_complete_event(self, swarmie_state, elapsed_time):
     if self._current_state == FetchAction.PICKING_UP_TARGET_STATE:
-      # TODO: Determine if we actually picked up the target!
-      self._current_state = FetchAction.MOVE_TO_NEST_STATE
-      rospy.loginfo('FetchAction PICKING_UP_TARGET_STATE -> MOVE_TO_NEST_STATE')
-      self._current_action = MoveToCellAction(self.swarmie_name, self.arena, self.arena.nest_grid_tl)
-      # return self._current_action.update(swarmie_state, elapsed_time)
+      picked_up = bool(self.tag_state.cube_tags) and self.tag_state.cube_tags[0].is_new
+      if picked_up:
+        self._current_state = FetchAction.MOVE_TO_NEST_STATE
+        rospy.loginfo('FetchAction PICKING_UP_TARGET_STATE -> MOVE_TO_NEST_STATE')
+        self._current_action = MoveToCellAction(self.swarmie_name, self.arena, self.arena.nest_grid_tl)
+      else:
+        self._current_state = FetchAction.DROP_OFF_TARGET_STATE
+        rospy.loginfo('FetchAction PICKING_UP_TARGET_STATE -> DROP_OFF_TARGET_STATE')
     else:
       rospy.logwarn('FetchAction pickup_complete_event in {} state? Abort FetchAction'.format(self._current_state))
-    #   return None
 
   def _drop_off_complete_event(self, swarmie_state, elapsed_time):
-    # TODO: Determine if we actually scored!
+    at_nest = abs(swarmie_state.odom_global[0]) <= 0.5
+    at_nest = at_nest and abs(swarmie_state.odom_global[1]) <= 0.5
+    if at_nest:
+      rospy.loginfo('FetchAction GOOOOOOOOOOOOOOOOOOOOOOAAAAAAAL!')
     self._current_state = FetchAction.DONE_STATE
     rospy.loginfo('FetchAction DONE_STATE')
-    # return None
 
   def update(self, swarmie_state, elapsed_time):
     if self._current_state is None:

@@ -4,15 +4,15 @@
 import math
 import numpy as np
 import rospy
-from utility import vectorized_yaw_wrap
+from utility import vectorized_yaw_wrap, YawBearing
 from . import TurnAction
 
 class SweepAction(object):
   ORIENTATIONS = np.array([
-    -1. * math.pi,
-    -0.5 * math.pi,
-    0.0,
-    0.5 * math.pi
+    YawBearing.WEST,
+    YawBearing.SOUTH,
+    YawBearing.EAST,
+    YawBearing.NORTH
   ])
   def __init__(self, swarmie_name, tag_state):
     self.swarmie_name = swarmie_name
@@ -42,8 +42,8 @@ class SweepAction(object):
       )
       sweep_idxs = np.mod(sweep_idxs + count_arr, count_arr)
       self._sub_action_sequence = [
-        TurnAction(self.swarmie_name, SweepAction.ORIENTATIONS[sweep_idxs[0]], min_skid=-90., max_skid=90.),
-        TurnAction(self.swarmie_name, SweepAction.ORIENTATIONS[sweep_idxs[1]], min_skid=-90., max_skid=90.),
+        TurnAction(self.swarmie_name, SweepAction.ORIENTATIONS[sweep_idxs[0]], min_skid=-50., max_skid=50.),
+        TurnAction(self.swarmie_name, SweepAction.ORIENTATIONS[sweep_idxs[1]], min_skid=-50., max_skid=50.),
         TurnAction(self.swarmie_name, SweepAction.ORIENTATIONS[orientation_idx])
       ]
     next_response = None
