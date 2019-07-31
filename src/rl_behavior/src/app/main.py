@@ -33,6 +33,7 @@ from events import (
   CubeSpottedEvent,
   SwarmieLocEvent
 )
+from agent import StateRepository
 from . import SwarmieState, TagState
 
 class RlBehavior(object):
@@ -67,12 +68,12 @@ class RlBehavior(object):
   NEST_X_TOP_LEFT = (-0.5, 0.5)
   NEST_DIMS = (1.0, 1.0)
   CUBE_ANNOUNCE_THRESHOLD = 0.25 # meters
+  CUBE_COUNT = 16
 
   def __init__(self, swarmie_name):
     self.swarmie_name = swarmie_name
     self.swarmie_id = RlBehavior.NAME_TO_ID_MAP.index(swarmie_name)
     self.emitter = EventEmitter()
-    self.swarmie_state = SwarmieState(self.swarmie_name)
     self.mode = RlBehavior.MANUAL_MODE
     self.tf = None
     self.coord_xform = CoordinateTransform(
@@ -87,6 +88,19 @@ class RlBehavior(object):
       RlBehavior.NEST_DIMS,
       self.emitter
     )
+    self.swarmie_state = SwarmieState(
+      self.swarmie_name,
+      self.swarmie_id,
+      self.coord_xform,
+      self.emitter
+    )
+    self.rl_state_rep = StateRepository(
+      list(range(len(RlBehavior.NAME_TO_ID_MAP))),
+      self.swarmie_id,
+      RlBehavior.CUBE_COUNT,
+      RlBehavior.GRID_QUANTIZATION,
+      self.emitter
+    )
     self.tag_state = None
     self._latest_tag_list = None
     self._current_action = None
@@ -95,8 +109,6 @@ class RlBehavior(object):
     self.hb_pub = None
     self.infolog_pub = None
     self.drive_cmd_pub = None
-    self.cube_report_pub = None
-    self.pos_report_pub = None
     self.wrist_cmd_pub = None
     self.fingers_cmd_pub = None
     # Timers -------------------------------------------------------------------
@@ -114,8 +126,6 @@ class RlBehavior(object):
     self.joy_sub = None
     self.target_sub = None
     self.maint_cmd_sub = None
-    self.cube_report_sub = None
-    self.pos_report_sub = None
   
   def run(self):
     print('Welcome to the world of tomorrow {}!'.format(self.swarmie_name))
@@ -148,16 +158,6 @@ class RlBehavior(object):
     self.drive_cmd_pub = rospy.Publisher(
       '{}/driveControl'.format(self.swarmie_name),
       Skid,
-      queue_size=10
-    )
-    self.cube_report_pub = rospy.Publisher(
-      '/aprilCubeReport',
-      GridReport,
-      queue_size=10
-    )
-    self.pos_report_pub = rospy.Publisher(
-      '/positionReport',
-      GridReport,
       queue_size=10
     )
     self.wrist_cmd_pub = rospy.Publisher(
@@ -226,18 +226,6 @@ class RlBehavior(object):
       callback=self._on_maint_cmd,
       queue_size=10
     )
-    self.cube_report_sub = rospy.Subscriber(
-      '/aprilCubeReport',
-      GridReport,
-      callback=self._on_april_cube_report,
-      queue_size=10
-    )
-    self.pos_report_sub = rospy.Subscriber(
-      '/positionReport',
-      GridReport,
-      callback=self._on_swarmie_pos_report,
-      queue_size=10
-    )
     # --------------------------------------------------------------------------
     # Set up all the timers
     #
@@ -252,6 +240,7 @@ class RlBehavior(object):
     # --------------------------------------------------------------------------
     # Away we go!
     #
+    self.rl_state_rep.init_remote()
     rospy.Timer(RlBehavior.WARMUP_TIME, self._on_warmup_timer)
     rospy.spin()
   
@@ -328,11 +317,10 @@ class RlBehavior(object):
         self.tag_state.update(self._latest_tag_list).sort()
       for a_tag_report in self.tag_state.cube_tags:
         if a_tag_report.tag_dist > RlBehavior.CUBE_ANNOUNCE_THRESHOLD:
-          self.cube_report_pub.publish(
-            GridReport(
-              grid_x=a_tag_report.grid_coords[0],
-              grid_y=a_tag_report.grid_coords[1],
-              swarmie_id=self.swarmie_id
+          self.emitter.emit(
+            CubeSpottedEvent(
+              swarmie_id=self.swarmie_id,
+              cube_loc=a_tag_report.grid_coords[0:2]
             )
           )
       # ------------------------------------------------------------------------
@@ -403,45 +391,8 @@ class RlBehavior(object):
         yaw
       ]
     )
-    if self.initialized:
-      grid_coords = self.coord_xform.from_real_to_grid(
-        self.swarmie_state.odom_global[0:2]
-      )
-      self.pos_report_pub.publish(
-        GridReport(
-          grid_x=grid_coords[0],
-          grid_y=grid_coords[1],
-          swarmie_id=self.swarmie_id
-        )
-      )
     self.swarmie_state.linear_vel = sample.twist.twist.linear.x
     self.swarmie_state.angular_vel = sample.twist.twist.angular.z
-
-  # def _on_map_update(self, sample):
-  #   """Map-based position update callback.
-
-  #   Called by ROS whenever a sample arrives via the <swarmie>/odom/ekf topic,
-  #   communicating the currently-sensed position of the swarmie using a global
-  #   reference frame.
-
-  #   :param sample: Odometry sample.
-  #   :type sample: nav_msgs.msg.Odometry
-  #   """
-  #   (_, _, yaw) = euler_from_quaternion(
-  #     (
-  #       sample.pose.pose.orientation.x,
-  #       sample.pose.pose.orientation.y,
-  #       sample.pose.pose.orientation.z,
-  #       sample.pose.pose.orientation.w
-  #     )
-  #   )
-  #   self.swarmie_state.map_current = np.array(
-  #     [
-  #       sample.pose.pose.position.x,
-  #       sample.pose.pose.position.y,
-  #       yaw
-  #     ]
-  #   )
 
   def _on_mode_change(self, sample):
     """Operating mode update callback.
@@ -547,22 +498,6 @@ class RlBehavior(object):
     :type tag_list: apriltags_ros.msg.AprilTagDetectionArray
     """
     self._latest_tag_list = tag_list
-
-  def _on_april_cube_report(self, the_report):
-    self.emitter.emit(
-      CubeSpottedEvent(
-        cube_loc=(the_report.grid_x, the_report.grid_y),
-        swarmie_id=the_report.swarmie_id
-      )
-    )
-
-  def _on_swarmie_pos_report(self, the_report):
-    self.emitter.emit(
-      SwarmieLocEvent(
-        swarmie_loc=(the_report.grid_x, the_report.grid_y),
-        swarmie_id=the_report.swarmie_id
-      )
-    )
 
   def _on_maint_cmd(self, the_cmd):
     cmd_str = str(the_cmd.data).lower()

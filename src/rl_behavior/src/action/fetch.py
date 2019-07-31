@@ -61,9 +61,6 @@ class FetchAction(object):
         0.0 - swarmie_state.odom_global[0]
       )
       self._current_action = TurnAction(self.swarmie_name, target_angle)
-      # self._current_state = FetchAction.DROP_OFF_TARGET_STATE
-      # rospy.loginfo('FetchAction MOVE_TO_NEST_STATE -> DROP_OFF_TARGET_STATE')
-      # self._current_action = DropOffAction(self.swarmie_name)
     else:
       rospy.logwarn('FetchAction move_complete_event in {} state? Abort FetchAction'.format(self._current_state))
       self._current_state = FetchAction.DONE_STATE
@@ -110,6 +107,7 @@ class FetchAction(object):
           self.swarmie_name,
           nest_corner
         )
+        swarmie_state.picked_up_cube()
       else:
         self._current_state = FetchAction.DROP_OFF_TARGET_STATE
         self._current_action = DropOffAction(self.swarmie_name)
@@ -127,6 +125,7 @@ class FetchAction(object):
     at_nest = distance.euclidean([0.0, 0.0], swarmie_state.odom_global[0:2]) < 0.8
     if at_nest:
       rospy.loginfo('FetchAction GOOOOOOOOOOOOOOOOOOOOOOAAAAAAAL!')
+      swarmie_state.collected_cube()
     self._current_state = FetchAction.DONE_STATE
     rospy.loginfo('FetchAction DONE_STATE')
 

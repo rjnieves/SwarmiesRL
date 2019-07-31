@@ -4,6 +4,8 @@
 import math
 import numpy as np
 from scipy.spatial import distance
+import rospy
+from swarmie_msgs.msg import GridReport
 from events import (
   SwarmieLocEvent,
   CubeSpottedEvent,
@@ -14,20 +16,53 @@ from events import (
 )
 
 class StateRepository(object):
-  def __init__(self, swarmie_id_list, cube_count, arena_dims, emitter):
+  def __init__(self, swarmie_id_list, own_id, cube_count, arena_dims, emitter):
     self.cube_count = cube_count
     self.arena_dims = arena_dims
     self.episode_reset(swarmie_id_list)
+    self.own_swarmie_id = own_id
     self.emitter = emitter
-    self.emitter.on_event(SwarmieLocEvent, self.swarmie_loc_update)
-    self.emitter.on_event(CubeSpottedEvent, self.cube_spotted)
-    self.emitter.on_event(CubePickedUpEvent, self.cube_picked_up_by)
-    self.emitter.on_event(CubeCollectedEvent, self.cube_collected)
-    self.emitter.on_event(CubeDroppedEvent, self.cube_dropped_by)
+    self.emitter.on_event(SwarmieLocEvent, self.local_swarmie_loc_update)
+    self.emitter.on_event(CubeSpottedEvent, self.local_cube_spotted)
+    self.emitter.on_event(CubePickedUpEvent, self.local_cube_picked_up_by)
+    self.emitter.on_event(CubeCollectedEvent, self.local_cube_collected)
+    self.emitter.on_event(CubeDroppedEvent, self.local_cube_dropped_by)
+    self.cube_report_sub = None
+    self.cube_report_pub = None
+    self.pos_report_sub = None
+    self.pos_report_pub = None
 
   @property
   def state_size(self):
     return len(self.cube_counts) + (len(self.swarmie_pos) * 2)
+
+  def init_remote(self):
+    # --------------------------------------------------------------------------
+    # Set up all the publishers
+    self.cube_report_pub = rospy.Publisher(
+      '/aprilCubeReport',
+      GridReport,
+      queue_size=10
+    )
+    self.pos_report_pub = rospy.Publisher(
+      '/positionReport',
+      GridReport,
+      queue_size=10
+    )
+    # --------------------------------------------------------------------------
+    # Set up all the subscribers
+    self.cube_report_sub = rospy.Subscriber(
+      '/aprilCubeReport',
+      GridReport,
+      callback=self.remote_cube_spotted,
+      queue_size=10
+    )
+    self.pos_report_sub = rospy.Subscriber(
+      '/positionReport',
+      GridReport,
+      callback=self.remote_swarmie_loc_update,
+      queue_size=10
+    )
 
   def episode_reset(self, swarmie_id_list):
     self.spotted_cubes = set()
@@ -105,23 +140,70 @@ class StateRepository(object):
       idx += 1
     return result
 
-  def swarmie_loc_update(self, event):
+  def local_swarmie_loc_update(self, event):
     self.swarmie_pos[event.swarmie_id] = event.swarmie_loc
+    if (
+      self.pos_report_pub is not None and
+      event.swarmie_id == self.own_swarmie_id
+    ):
+      self.pos_report_pub.publish(
+        GridReport(
+          swarmie_id=self.own_swarmie_id,
+          grid_x=event.swarmie_loc[0],
+          grid_y=event.swarmie_loc[1]
+        )
+      )
   
-  def cube_spotted(self, event):
-    if event.cube_loc not in self.spotted_cubes:
-      self.emitter.emit(NewCubeEvent(event.cube_loc, event.swarmie_id))
+  def remote_swarmie_loc_update(self, report):
+    if report.swarmie_id != self.own_swarmie_id:
+      self.local_swarmie_loc_update(
+        SwarmieLocEvent(
+          swarmie_id=report.swarmie_id,
+          swarmie_loc=(report.grid_x, report.grid_y)
+        )
+      )
+
+  def local_cube_spotted(self, event):
+    if event.swarmie_id == self.own_swarmie_id:
+      if event.cube_loc not in self.spotted_cubes:
+        self.emitter.emit(NewCubeEvent(event.cube_loc, event.swarmie_id))
+      if self.cube_report_pub is not None:
+        self.cube_report_pub.publish(
+          GridReport(
+            swarmie_id=self.own_swarmie_id,
+            grid_x=event.cube_loc[0],
+            grid_y=event.cube_loc[1]
+          )
+        )
     self.spotted_cubes.add(event.cube_loc)
-  
-  def cube_picked_up_by(self, event):
+
+  def remote_cube_spotted(self, report):
+    if report.swarmie_id != self.own_swarmie_id:
+      self.local_cube_spotted(
+        CubeSpottedEvent(
+          swarmie_id=report.swarmie_id,
+          cube_loc=(report.grid_x, report.grid_y)
+        )
+      )
+
+  def local_cube_picked_up_by(self, event):
     self.spotted_cubes.remove(event.cube_loc)
     self.swarmie_state[event.swarmie_id] = True
 
-  def cube_dropped_by(self, event):
+  def remote_cube_picked_up_by(self, report):
+    pass
+
+  def local_cube_dropped_by(self, event):
     self.swarmie_state[event.swarmie_id] = False
 
-  def cube_collected(self, event):
+  def remote_cube_dropped_by(self, report):
+    pass
+
+  def local_cube_collected(self, event):
     self.swarmie_state[event.swarmie_id] = False
     self.cube_counts['collected'] += 1
+
+  def remote_cube_collected(self, report):
+    pass
 
 # vim: set ts=2 sw=2 expandtab:
