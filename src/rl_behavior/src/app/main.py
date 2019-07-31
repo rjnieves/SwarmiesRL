@@ -3,6 +3,7 @@ import math
 import sys
 import traceback
 import re
+import os
 import numpy as np
 import rospy
 import message_filters
@@ -33,7 +34,8 @@ from events import (
   CubeSpottedEvent,
   SwarmieLocEvent
 )
-from agent import StateRepository
+from agent import StateRepository, RewardCenter, DqnAgent
+from agent.policy import GreedyPolicy
 from . import SwarmieState, TagState
 
 class RlBehavior(object):
@@ -69,8 +71,11 @@ class RlBehavior(object):
   NEST_DIMS = (1.0, 1.0)
   CUBE_ANNOUNCE_THRESHOLD = 0.25 # meters
   CUBE_COUNT = 16
+  ACTION_COUNT = 2
+  SEARCH_ACTION = 0
+  FETCH_ACTION = 1
 
-  def __init__(self, swarmie_name):
+  def __init__(self, swarmie_name, app_root_dir):
     self.swarmie_name = swarmie_name
     self.swarmie_id = RlBehavior.NAME_TO_ID_MAP.index(swarmie_name)
     self.emitter = EventEmitter()
@@ -100,6 +105,12 @@ class RlBehavior(object):
       RlBehavior.CUBE_COUNT,
       RlBehavior.GRID_QUANTIZATION,
       self.emitter
+    )
+    self.rl_agent = DqnAgent(
+      policy=GreedyPolicy(),
+      state_size=self.rl_state_rep.state_size,
+      action_size=RlBehavior.ACTION_COUNT,
+      model_file_path=os.path.join(app_root_dir, 'rl_models', '{}_model.h5'.format(self.swarmie_name))
     )
     self.tag_state = None
     self._latest_tag_list = None
@@ -323,6 +334,34 @@ class RlBehavior(object):
               cube_loc=a_tag_report.grid_coords[0:2]
             )
           )
+      # ------------------------------------------------------------------------
+      # Automatically select an action if in automatic mode
+      timestep_step = 'Automatic Action Selection'
+      if self.mode == RlBehavior.AUTONOMOUS_MODE:
+        self._current_action = None
+        state_vector = self.rl_state_rep.make_state_vector()
+        rl_action_id = self.rl_agent.act(state_vector)
+        rospy.loginfo(
+          'Automated agent selected action {}'.format(
+            rl_action_id
+          )
+        )
+        if rl_action_id == RlBehavior.SEARCH_ACTION:
+          quad_name = np.random.choice(SearchAction.SEARCH_QUADRANTS)
+          self._current_action = SearchAction(
+            self.swarmie_name,
+            self.arena,
+            quad_name
+          )
+        elif rl_action_id == RlBehavior.FETCH_ACTION:
+          nearest_cube = self.rl_state_rep.nearest_cube[self.swarmie_id]
+          if nearest_cube is not None:
+            self._current_action = FetchAction(
+              self.swarmie_name,
+              self.arena,
+              nearest_cube,
+              self.tag_state
+            )
       # ------------------------------------------------------------------------
       # Execute current action, should there be one.
       timestep_step = 'Action Execution'

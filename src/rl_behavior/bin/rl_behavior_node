@@ -6,7 +6,7 @@ from app import RlBehavior
 
 def main():
   argv = rospy.myargv(argv=sys.argv)
-  the_app = RlBehavior(argv[1])
+  the_app = RlBehavior(argv[1], argv[2])
   the_app.run()
 
 if __name__ == '__main__':

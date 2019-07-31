@@ -14,6 +14,6 @@ class BaseAgent(object):
     pass
   
   def learn(self):
-    raise NotImplementedError("BaseAgent.learn()")
+    pass
 
 # vim: set ts=2 sw=2 expandtab:
