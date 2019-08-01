@@ -10,5 +10,6 @@ from .pickup import CubePickedUpEvent
 from .dropped import CubeDroppedEvent
 from .collected import CubeCollectedEvent
 from .futilecollect import FutileCollectAttemptEvent
+from .vanished import CubeVanishedEvent
 
 # vim: set ts=2 sw=2 expandtab:

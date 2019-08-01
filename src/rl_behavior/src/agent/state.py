@@ -13,7 +13,8 @@ from events import (
   CubePickedUpEvent,
   CubeCollectedEvent,
   CubeDroppedEvent,
-  NewCubeEvent
+  NewCubeEvent,
+  CubeVanishedEvent
 )
 
 class StateRepository(object):
@@ -28,6 +29,7 @@ class StateRepository(object):
     self.emitter.on_event(CubePickedUpEvent, self.local_cube_picked_up_by)
     self.emitter.on_event(CubeCollectedEvent, self.local_cube_collected)
     self.emitter.on_event(CubeDroppedEvent, self.local_cube_dropped_by)
+    self.emitter.on_event(CubeVanishedEvent, self.local_cube_vanished)
     self.cube_report_sub = None
     self.cube_report_pub = None
     self.pos_report_sub = None
@@ -38,6 +40,8 @@ class StateRepository(object):
     self.cube_dropped_pub = None
     self.cube_pickup_sub = None
     self.cube_pickup_pub = None
+    self.cube_vanishing_sub = None
+    self.cube_vanishing_pub = None
 
   @property
   def state_size(self):
@@ -71,6 +75,11 @@ class StateRepository(object):
       GridReport,
       queue_size=10
     )
+    self.cube_vanishing_pub = rospy.Publisher(
+      '/cubeVanishingReport',
+      GridReport,
+      queue_size=10
+    )
     # --------------------------------------------------------------------------
     # Set up all the subscribers
     self.cube_report_sub = rospy.Subscriber(
@@ -101,6 +110,12 @@ class StateRepository(object):
       '/pickupReport',
       GridReport,
       callback=self.remote_cube_picked_up_by,
+      queue_size=10
+    )
+    self.cube_vanishing_sub = rospy.Subscriber(
+      '/cubeVanishingReport',
+      GridReport,
+      callback=self.remote_cube_vanished,
       queue_size=10
     )
 
@@ -275,6 +290,26 @@ class StateRepository(object):
       self.local_cube_collected(
         CubeCollectedEvent(
           swarmie_id=report.data
+        )
+      )
+
+  def local_cube_vanished(self, event):
+    if event.swarmie_id == self.own_swarmie_id and self.cube_vanishing_pub is not None:
+      self.cube_vanishing_pub.publish(
+        GridReport(
+          swarmie_id=self.own_swarmie_id,
+          grid_x=event.cube_loc[0],
+          grid_y=event.cube_loc[1]
+        )
+      )
+    self.spotted_cubes.discard(event.cube_loc)
+
+  def remote_cube_vanished(self, report):
+    if report.swarmie_id != self.own_swarmie_id:
+      self.local_cube_vanished(
+        CubeVanishedEvent(
+          swarmie_id=report.swarmie_id,
+          cube_loc=(report.grid_x, report.grid_y)
         )
       )
 
