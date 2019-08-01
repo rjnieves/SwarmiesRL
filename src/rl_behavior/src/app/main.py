@@ -327,7 +327,10 @@ class RlBehavior(object):
       if self._latest_tag_list is not None:
         self.tag_state.update(self._latest_tag_list).sort()
       for a_tag_report in self.tag_state.cube_tags:
-        if a_tag_report.tag_dist > RlBehavior.CUBE_ANNOUNCE_THRESHOLD:
+        if (
+          a_tag_report.tag_dist > RlBehavior.CUBE_ANNOUNCE_THRESHOLD and not
+          self.arena.grid_loc_in_nest(a_tag_report.grid_coords)
+        ):
           self.emitter.emit(
             CubeSpottedEvent(
               swarmie_id=self.swarmie_id,
