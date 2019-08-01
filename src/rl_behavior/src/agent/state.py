@@ -51,7 +51,7 @@ class StateRepository(object):
     # --------------------------------------------------------------------------
     # Set up all the publishers
     self.cube_report_pub = rospy.Publisher(
-      '/aprilCubeReport',
+      '/cubeSpottedReport',
       GridReport,
       queue_size=10
     )
@@ -83,7 +83,7 @@ class StateRepository(object):
     # --------------------------------------------------------------------------
     # Set up all the subscribers
     self.cube_report_sub = rospy.Subscriber(
-      '/aprilCubeReport',
+      '/cubeSpottedReport',
       GridReport,
       callback=self.remote_cube_spotted,
       queue_size=10

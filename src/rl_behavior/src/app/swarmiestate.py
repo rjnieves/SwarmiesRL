@@ -3,7 +3,7 @@
 
 import math
 import numpy as np
-from events import CubePickedUpEvent, CubeCollectedEvent, SwarmieLocEvent
+from events import CubePickedUpEvent, CubeCollectedEvent, SwarmieLocEvent, CubeVanishedEvent
 
 class SwarmieState(object):
   CENTER_IDX = 0
@@ -114,6 +114,17 @@ class SwarmieState(object):
     self.emitter.emit(
       CubeCollectedEvent(
         swarmie_id=self.swarmie_id
+      )
+    )
+
+  def cube_vanished(self):
+    grid_loc = self.coord_xform.from_real_to_grid(
+      self.odom_global[0:2]
+    )
+    self.emitter.emit(
+      CubeVanishedEvent(
+        swarmie_id=self.swarmie_id,
+        cube_loc=grid_loc
       )
     )
 

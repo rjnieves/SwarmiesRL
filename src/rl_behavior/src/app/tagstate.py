@@ -65,12 +65,13 @@ class TagState(object):
         repr(self.base_link_coords)
       )
 
-  def __init__(self, swarmie_name, swarmie_state, tf, coord_xform):
+  def __init__(self, swarmie_name, swarmie_state, tf, coord_xform, arena):
     super(TagState, self).__init__()
     self.swarmie_name = swarmie_name
     self.swarmie_state = swarmie_state
     self.coord_xform = coord_xform
     self.tf = tf
+    self.arena = arena
     self.reset()
   
   def reset(self):
@@ -152,7 +153,7 @@ class TagState(object):
           grid_coords=tag_grid_coord,
           base_link_coords=base_link_coords
         )
-        if a_tag_detect.id == 0:
+        if a_tag_detect.id == 0 and not self.arena.grid_loc_in_nest(tag_grid_coord):
           self._merge_report(tag_report, self.cube_tags)
         elif a_tag_detect.id == 128:
           self._merge_report(tag_report, self.boundary_tags)

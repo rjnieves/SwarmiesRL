@@ -68,4 +68,7 @@ class SweepAction(object):
         next_response = None
     return next_response
 
+  def __str__(self):
+    return 'SweepAction'
+
 # vim: set ts=2 sw=2 expandtab:

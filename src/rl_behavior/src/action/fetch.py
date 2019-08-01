@@ -14,7 +14,8 @@ from . import (
   DropOffAction,
   ActionResponse,
   MoveToRealAction,
-  TurnAction
+  TurnAction,
+  DriveAction
 )
 
 class FetchAction(object):
@@ -25,13 +26,15 @@ class FetchAction(object):
   MOVE_TO_NEST_STATE = 5
   TURN_TO_NEST_CENTER_STATE = 6
   DROP_OFF_TARGET_STATE = 7
-  DONE_STATE = 8
+  BACK_AWAY_STATE = 8
+  DONE_STATE = 9
   NEST_DROP_OFF_REAL = {
     (False, True): (-0.4, 0.4),
     (True, True): (0.4, 0.4),
     (True, False): (0.4, -0.4),
     (False, False): (-0.4, -0.4),
   }
+  BACK_AWAY_TIME = rospy.Duration(secs=3)
 
   def __init__(self, swarmie_name, arena, target_grid_coords, tag_state):
     super(FetchAction, self).__init__()
@@ -41,6 +44,7 @@ class FetchAction(object):
     self.tag_state = tag_state
     self._current_state = None
     self._current_action = None
+    self._back_away_countdown = FetchAction.BACK_AWAY_TIME - rospy.Duration() # force copy
 
   def _move_complete_event(self, swarmie_state, elapsed_time):
     tag_spotted = bool(self.tag_state.cube_tags)
@@ -75,6 +79,7 @@ class FetchAction(object):
       else:
         rospy.loginfo('FetchAction SWEEPING_SITE_STATE -> DONE_STATE')
         self._current_state = FetchAction.DONE_STATE
+        swarmie_state.cube_vanished()
     else:
       rospy.logwarn('FetchAction sweep_complete_event in {} state? Abort FetchAction'.format(self._current_state))
       self._current_state = FetchAction.DONE_STATE
@@ -91,6 +96,7 @@ class FetchAction(object):
   def _approach_failed_event(self, swarmie_state, elapsed_time):
     if self._current_state == FetchAction.APPROACHING_TARGET_STATE:
       rospy.loginfo('FetchAction APPROACHING_TARGET_STATE -> DONE_STATE')
+      swarmie_state.cube_vanished()
     else:
       rospy.logwarn('FetchAction approach_failed_event in {} state? Abort FetchAction'.format(self._current_state))
     self._current_state = FetchAction.DONE_STATE
@@ -124,8 +130,17 @@ class FetchAction(object):
   def _drop_off_complete_event(self, swarmie_state, elapsed_time):
     at_nest = distance.euclidean([0.0, 0.0], swarmie_state.odom_global[0:2]) < 0.8
     if at_nest:
+      self._current_state = FetchAction.BACK_AWAY_STATE
+      rospy.loginfo('FetchAction DROP_OFF_TARGET_STATE -> BACK_AWAY_STATE')
+      self._current_action = DriveAction(self.swarmie_name, forward=False, speed=0.3)
+      self._back_away_countdown = FetchAction.BACK_AWAY_TIME - rospy.Duration()
       rospy.loginfo('FetchAction GOOOOOOOOOOOOOOOOOOOOOOAAAAAAAL!')
-      swarmie_state.collected_cube()
+    else:
+      self._current_state = FetchAction.DONE_STATE
+      rospy.loginfo('FetchAction DROP_OFF_TARGET_STATE -> DONE_STATE')
+  
+  def _drive_complete_event(self, swarmie_state, elapsed_time):
+    swarmie_state.collected_cube()
     self._current_state = FetchAction.DONE_STATE
     rospy.loginfo('FetchAction DONE_STATE')
 
@@ -135,6 +150,10 @@ class FetchAction(object):
       rospy.loginfo('FetchAction START -> MOVE_TO_TARGET_STATE')
       self._current_action = MoveToCellAction(self.swarmie_name, self.arena, self.target_grid_coords)
     next_response = self._current_action.update(swarmie_state, elapsed_time)
+    if self._current_state == FetchAction.BACK_AWAY_STATE:
+      self._back_away_countdown -= min(self._back_away_countdown, elapsed_time)
+    if not self._back_away_countdown:
+      next_response = None
     if next_response is None:
       if isinstance(self._current_action, MoveToCellAction) or isinstance(self._current_action, MoveToRealAction):
         self._move_complete_event(swarmie_state, elapsed_time)
@@ -151,9 +170,16 @@ class FetchAction(object):
         self._turn_complete_event(swarmie_state, elapsed_time)
       elif isinstance(self._current_action, DropOffAction):
         self._drop_off_complete_event(swarmie_state, elapsed_time)
-
+      elif isinstance(self._current_action, DriveAction):
+        self._drive_complete_event(swarmie_state, elapsed_time)
       if self._current_state != FetchAction.DONE_STATE:
         next_response = ActionResponse(Skid(left=0., right=0.))
+    rospy.loginfo(
+      'FetchAction to {} executing {}'.format(
+        self.target_grid_coords,
+        self._current_action
+      )
+    )
     return next_response
 
 # vim: set ts=2 sw=2 expandtab:

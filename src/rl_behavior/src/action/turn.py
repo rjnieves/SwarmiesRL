@@ -69,4 +69,7 @@ class TurnAction(object):
       skid=Skid(left=left_cmd, right=right_cmd)
     )
 
+  def __str__(self):
+    return 'TurnAction({})'.format(math.degrees(self.target_angle))
+
 # vim: set ts=2 sw=2 expandtab:

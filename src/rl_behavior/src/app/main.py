@@ -74,6 +74,10 @@ class RlBehavior(object):
   ACTION_COUNT = 2
   SEARCH_ACTION = 0
   FETCH_ACTION = 1
+  ACTION_NAMES = {
+    SEARCH_ACTION: 'SEARCH',
+    FETCH_ACTION: 'FETCH'
+  }
 
   def __init__(self, swarmie_name, app_root_dir):
     self.swarmie_name = swarmie_name
@@ -145,7 +149,8 @@ class RlBehavior(object):
       self.swarmie_name,
       self.swarmie_state,
       self.tf,
-      self.coord_xform
+      self.coord_xform,
+      self.arena
     )
     self.rl_agent = DqnAgent(
       policy=GreedyPolicy(),
@@ -332,16 +337,14 @@ class RlBehavior(object):
       if self._latest_tag_list is not None:
         self.tag_state.update(self._latest_tag_list).sort()
       for a_tag_report in self.tag_state.cube_tags:
-        if (
-          a_tag_report.tag_dist > RlBehavior.CUBE_ANNOUNCE_THRESHOLD and not
-          self.arena.grid_loc_in_nest(a_tag_report.grid_coords)
-        ):
-          self.emitter.emit(
-            CubeSpottedEvent(
-              swarmie_id=self.swarmie_id,
-              cube_loc=a_tag_report.grid_coords[0:2]
-            )
+        if a_tag_report.tag_dist <= RlBehavior.CUBE_ANNOUNCE_THRESHOLD:
+          continue
+        self.emitter.emit(
+          CubeSpottedEvent(
+            swarmie_id=self.swarmie_id,
+            cube_loc=a_tag_report.grid_coords[0:2]
           )
+        )
       # ------------------------------------------------------------------------
       # Automatically select an action if in automatic mode
       timestep_step = 'Automatic Action Selection'
@@ -350,25 +353,37 @@ class RlBehavior(object):
         rl_action_id = self.rl_agent.act(state_vector)
         rospy.loginfo(
           'Automated agent selected action {}'.format(
-            rl_action_id
+            RlBehavior.ACTION_NAMES[rl_action_id]
           )
         )
         if rl_action_id == RlBehavior.SEARCH_ACTION and not isinstance(self._current_action, SearchAction):
-          quad_name = np.random.choice(SearchAction.SEARCH_QUADRANTS)
-          self._current_action = SearchAction(
-            self.swarmie_name,
-            self.arena,
-            quad_name
-          )
-        elif rl_action_id == RlBehavior.FETCH_ACTION and not isinstance(self._current_action, FetchAction):
-          nearest_cube = self.rl_state_rep.nearest_cube[self.swarmie_id]
-          if nearest_cube is not None:
-            self._current_action = FetchAction(
+          if self._current_action is None:
+            # TEMPORARY SETUP
+            SEARCH_QUAD_FOR = {
+              'achilles': SearchAction.ALPHA_QUADRANT,
+              'aeneas': SearchAction.CHARLIE_QUADRANT,
+              'ajax': SearchAction.BRAVO_QUADRANT
+            }
+            quad_name = SEARCH_QUAD_FOR[self.swarmie_name]
+            self._current_action = SearchAction(
               self.swarmie_name,
               self.arena,
-              nearest_cube,
-              self.tag_state
+              quad_name
             )
+          else:
+            self._current_action = None
+        elif rl_action_id == RlBehavior.FETCH_ACTION and not isinstance(self._current_action, FetchAction):
+          if self._current_action is None:
+            nearest_cube = self.rl_state_rep.nearest_cube[self.swarmie_id]
+            if nearest_cube is not None:
+              self._current_action = FetchAction(
+                self.swarmie_name,
+                self.arena,
+                nearest_cube,
+                self.tag_state
+              )
+          else:
+            self._current_action = None
       # ------------------------------------------------------------------------
       # Execute current action, should there be one.
       timestep_step = 'Action Execution'

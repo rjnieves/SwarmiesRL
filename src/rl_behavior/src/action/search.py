@@ -65,7 +65,7 @@ class SearchAction(object):
         self.arena.nest_grid_tl[1]
       ])
       self._quadrant_br = np.array([
-        self.arena.nest_grid_tl[0],
+        self.arena.nest_grid_tl[0] - 1,
         self.arena.grid_dims[1] - 2
       ])
       self._build_seq_row_primary()

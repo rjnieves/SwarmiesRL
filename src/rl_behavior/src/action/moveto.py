@@ -145,6 +145,6 @@ class MoveToCellAction(object):
       return None
 
   def __str__(self):
-    return 'move_to({})'.format(self.dest_coords)
+    return 'MoveToCellAction({})'.format(self.dest_coords)
 
 # vim: set ts=2 sw=2 expandtab:
