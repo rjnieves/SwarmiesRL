@@ -25,6 +25,8 @@ class MoveToCellAction(object):
     elif policy_move == (0, -1):
       # return math.pi / 2.
       return YawBearing.NORTH
+    else:
+      return None
 
   def __init__(self, swarmie_name, arena, dest_coords):
     super(MoveToCellAction, self).__init__()
@@ -102,7 +104,7 @@ class MoveToCellAction(object):
       except KeyError:
         self._plan_route(swarmie_grid_pos)
         error_countdown -= min(error_countdown, 0)
-    rospy.loginfo(
+    rospy.logdebug(
       '{} at {} next move is {}, yaw {}'.format(
         self.swarmie_name,
         swarmie_grid_pos,

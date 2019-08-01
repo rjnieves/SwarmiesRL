@@ -91,19 +91,8 @@ class Arena(object):
   def grid_cell_occupied(self, grid_coords):
     result = False
     grid_coords = np.array(grid_coords, dtype=np.int16)
-    rospy.loginfo(
-      'Swarmie grid locations known to arena: {}'.format(
-        self._swarmie_grid_locs
-      )
-    )
     for swarmie_grid_loc in self._swarmie_grid_locs[:]:
       result = result or np.all(swarmie_grid_loc == grid_coords)
-    rospy.loginfo(
-      'Grid occupied at {}? {}'.format(
-        tuple(grid_coords),
-        result
-      )
-    )
     return result
 
   def build_planning_grid(self, include_nest=True):
