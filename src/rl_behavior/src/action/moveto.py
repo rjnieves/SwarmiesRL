@@ -59,46 +59,57 @@ class MoveToCellAction(object):
       isinstance(self._current_sub_action, DriveAction)
     )
 
+  def _plan_route(self, current_grid_pos):
+      basic_plan = self.path_planner.calculate_path(
+        current_grid_pos,
+        tuple(self.dest_coords)
+      )
+      rospy.logdebug(
+        '{} created new path plan from {} to {}: {}'.format(
+          self.swarmie_name,
+          current_grid_pos,
+          self.dest_coords,
+          basic_plan
+        )
+      )
+      self._policy = dict(
+        (loc, move) for move, loc in basic_plan
+      )
+
   def update(self, swarmie_state, elapsed_time):
     swarmie_grid_pos = self.coord_xform.from_real_to_grid(
       swarmie_state.odom_global[0:2]
     )
     swarmie_yaw = swarmie_state.odom_current[2]
-    # abs_swarmie_yaw = abs(swarmie_yaw)
-    # if abs_swarmie_yaw > 3.13 and abs_swarmie_yaw < 3.15:
-    #   swarmie_yaw = abs_swarmie_yaw
     if self._policy is None:
-      self._policy = self.path_planner.calculate_path(
-        swarmie_grid_pos,
-        tuple(self.dest_coords),
-        nest_as_obstacle=self._avoid_nest
-      )
-      rospy.logdebug('Planning grid:\n{}'.format(self.arena.grid_to_str(self.path_planner._planning_grid)))
-      rospy.logdebug(
-        '{} created new path plan from {} to {}: {}'.format(
-          self.swarmie_name,
-          swarmie_grid_pos,
-          self.dest_coords,
-          self._policy
-        )
-      )
+      self._plan_route(swarmie_grid_pos)
     next_move = None
+    error_countdown = 3
     next_yaw = swarmie_yaw
-    while self._policy:
-      (next_move, at_location) = self._policy[0]
-      if at_location != swarmie_grid_pos:
-        del self._policy[0]
-      else:
+    while error_countdown > 0:
+      try:
+        next_move = self._policy[swarmie_grid_pos]
         next_yaw = MoveToCellAction.convert_policy_move_to_yaw(next_move)
-        rospy.logdebug(
-          '{} at {} next move is {}, yaw {}'.format(
-            self.swarmie_name,
-            swarmie_grid_pos,
-            next_move,
-            next_yaw
-          )
-        )
+        if next_move is not None:
+          future_pos = np.array(swarmie_grid_pos, dtype=np.int16) + np.array(next_move, dtype=np.int16)
+          if self.arena.grid_cell_occupied(future_pos):
+            rospy.logwarn(
+              '{} about to encroach onto another swarmie\'s space!'.format(
+                self.swarmie_name
+              )
+            )
         break
+      except KeyError:
+        self._plan_route(swarmie_grid_pos)
+        error_countdown -= min(error_countdown, 0)
+    rospy.loginfo(
+      '{} at {} next move is {}, yaw {}'.format(
+        self.swarmie_name,
+        swarmie_grid_pos,
+        next_move,
+        next_yaw
+      )
+    )
     if next_move is None:
       rospy.logdebug(
         '{} path plan is all out of moves. Done.'.format(

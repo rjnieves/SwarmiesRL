@@ -211,7 +211,7 @@ class StateRepository(object):
   
   def remote_swarmie_loc_update(self, report):
     if report.swarmie_id != self.own_swarmie_id:
-      self.local_swarmie_loc_update(
+      self.emitter.emit(
         SwarmieLocEvent(
           swarmie_id=report.swarmie_id,
           swarmie_loc=(report.grid_x, report.grid_y)
@@ -234,7 +234,7 @@ class StateRepository(object):
 
   def remote_cube_spotted(self, report):
     if report.swarmie_id != self.own_swarmie_id:
-      self.local_cube_spotted(
+      self.emitter.emit(
         CubeSpottedEvent(
           swarmie_id=report.swarmie_id,
           cube_loc=(report.grid_x, report.grid_y)
@@ -255,7 +255,7 @@ class StateRepository(object):
 
   def remote_cube_picked_up_by(self, report):
     if report.swarmie_id != self.own_swarmie_id:
-      self.local_cube_picked_up_by(
+      self.emitter.emit(
         CubePickedUpEvent(
           swarmie_id=report.swarmie_id,
           cube_loc=(report.grid_x, report.grid_y)
@@ -271,7 +271,7 @@ class StateRepository(object):
 
   def remote_cube_dropped_by(self, report):
     if report.data != self.own_swarmie_id:
-      self.local_cube_dropped_by(
+      self.emitter.emit(
         CubeDroppedEvent(
           swarmie_id=report.data
         )
@@ -287,7 +287,7 @@ class StateRepository(object):
 
   def remote_cube_collected(self, report):
     if report.data != self.own_swarmie_id:
-      self.local_cube_collected(
+      self.emitter.emit(
         CubeCollectedEvent(
           swarmie_id=report.data
         )
@@ -306,7 +306,7 @@ class StateRepository(object):
 
   def remote_cube_vanished(self, report):
     if report.swarmie_id != self.own_swarmie_id:
-      self.local_cube_vanished(
+      self.emitter.emit(
         CubeVanishedEvent(
           swarmie_id=report.swarmie_id,
           cube_loc=(report.grid_x, report.grid_y)
