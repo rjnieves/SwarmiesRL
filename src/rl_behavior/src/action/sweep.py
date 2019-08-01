@@ -52,17 +52,17 @@ class SweepAction(object):
       if next_response is not None:
         break
       else:
-        rospy.loginfo(
+        rospy.logdebug(
           'SweepAction done with {}'.format(repr(self._sub_action_sequence[0]))
         )
         del self._sub_action_sequence[0]
     if next_response is None:
-      rospy.loginfo(
+      rospy.logdebug(
         'SweepAction completely done'
       )
     else:
       if self.tag_state.cube_tags:
-        rospy.loginfo(
+        rospy.logdebug(
           'SweepAction found a block!'
         )
         next_response = None

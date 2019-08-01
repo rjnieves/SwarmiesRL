@@ -31,7 +31,7 @@ class TurnAction(object):
     #   yaw_current = abs_yaw_current
     yaw_diff = yaw_wrap(self.target_angle - yaw_current)
     if np.isclose(yaw_diff, 0., atol=2e-2):
-      rospy.loginfo(
+      rospy.logdebug(
         '{} yaw {} close enough to requested angle {}'.format(
           self.swarmie_name,
           yaw_current,
@@ -44,7 +44,7 @@ class TurnAction(object):
     yaw_error = yaw_wrap(self.target_angle - yaw_current)
     # yaw_error -= (2. * math.pi) if yaw_error > math.pi else 0.
     # yaw_error += (2. * math.pi) if yaw_error < (-1. * math.pi) else 0.
-    rospy.loginfo(
+    rospy.logdebug(
       '{} yaw set point is ({}), current is ({}), making an error of ({})'.format(
         self.swarmie_name,
         self.target_angle,

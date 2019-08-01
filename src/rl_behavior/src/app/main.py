@@ -106,12 +106,11 @@ class RlBehavior(object):
       RlBehavior.GRID_QUANTIZATION,
       self.emitter
     )
-    self.rl_agent = DqnAgent(
-      policy=GreedyPolicy(),
-      state_size=self.rl_state_rep.state_size,
-      action_size=RlBehavior.ACTION_COUNT,
-      model_file_path=os.path.join(app_root_dir, 'rl_models', '{}_model.h5'.format(self.swarmie_name))
+    self.model_file_path = os.path.join(
+      app_root_dir,
+      'rl_models', '{}_model.h5'.format(self.swarmie_name)
     )
+    self.rl_agent = None
     self.tag_state = None
     self._latest_tag_list = None
     self._current_action = None
@@ -147,6 +146,12 @@ class RlBehavior(object):
       self.swarmie_state,
       self.tf,
       self.coord_xform
+    )
+    self.rl_agent = DqnAgent(
+      policy=GreedyPolicy(),
+      state_size=self.rl_state_rep.state_size,
+      action_size=RlBehavior.ACTION_COUNT,
+      model_file_path=self.model_file_path
     )
     # --------------------------------------------------------------------------
     # Set up all the publishers
@@ -341,7 +346,6 @@ class RlBehavior(object):
       # Automatically select an action if in automatic mode
       timestep_step = 'Automatic Action Selection'
       if self.mode == RlBehavior.AUTONOMOUS_MODE:
-        self._current_action = None
         state_vector = self.rl_state_rep.make_state_vector()
         rl_action_id = self.rl_agent.act(state_vector)
         rospy.loginfo(
@@ -349,14 +353,14 @@ class RlBehavior(object):
             rl_action_id
           )
         )
-        if rl_action_id == RlBehavior.SEARCH_ACTION:
+        if rl_action_id == RlBehavior.SEARCH_ACTION and not isinstance(self._current_action, SearchAction):
           quad_name = np.random.choice(SearchAction.SEARCH_QUADRANTS)
           self._current_action = SearchAction(
             self.swarmie_name,
             self.arena,
             quad_name
           )
-        elif rl_action_id == RlBehavior.FETCH_ACTION:
+        elif rl_action_id == RlBehavior.FETCH_ACTION and not isinstance(self._current_action, FetchAction):
           nearest_cube = self.rl_state_rep.nearest_cube[self.swarmie_id]
           if nearest_cube is not None:
             self._current_action = FetchAction(
@@ -446,6 +450,7 @@ class RlBehavior(object):
     :type sample: std_msgs.msg.UInt8
     """
     if sample.data != self.mode:
+      self._current_action = None
       if sample.data in RlBehavior.MODE_DICT:
         self.mode = sample.data
         dict_entry = RlBehavior.MODE_DICT[sample.data]

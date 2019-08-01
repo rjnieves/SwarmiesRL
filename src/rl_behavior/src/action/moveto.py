@@ -40,7 +40,8 @@ class MoveToCellAction(object):
     self.coord_xform = arena.coord_xform
     self._policy = None
     self._current_sub_action = None
-    self._avoid_nest = not arena.grid_loc_in_nest(dest_coords)
+    # self._avoid_nest = not arena.grid_loc_in_nest(dest_coords)
+    self._avoid_nest = True
   
   def _already_turning_to(self, yaw_angle):
     result = (
@@ -72,8 +73,8 @@ class MoveToCellAction(object):
         tuple(self.dest_coords),
         nest_as_obstacle=self._avoid_nest
       )
-      rospy.loginfo('Planning grid:\n{}'.format(self.arena.grid_to_str(self.path_planner._planning_grid)))
-      rospy.loginfo(
+      rospy.logdebug('Planning grid:\n{}'.format(self.arena.grid_to_str(self.path_planner._planning_grid)))
+      rospy.logdebug(
         '{} created new path plan from {} to {}: {}'.format(
           self.swarmie_name,
           swarmie_grid_pos,
@@ -89,7 +90,7 @@ class MoveToCellAction(object):
         del self._policy[0]
       else:
         next_yaw = MoveToCellAction.convert_policy_move_to_yaw(next_move)
-        rospy.loginfo(
+        rospy.logdebug(
           '{} at {} next move is {}, yaw {}'.format(
             self.swarmie_name,
             swarmie_grid_pos,
@@ -99,7 +100,7 @@ class MoveToCellAction(object):
         )
         break
     if next_move is None:
-      rospy.loginfo(
+      rospy.logdebug(
         '{} path plan is all out of moves. Done.'.format(
           self.swarmie_name
         )
@@ -111,7 +112,7 @@ class MoveToCellAction(object):
     if not np.isclose(yaw_diff, 0., atol=2e-2):
       # Need to turn
       if not self._already_turning_to(next_yaw):
-        rospy.loginfo(
+        rospy.logdebug(
           '{} starting to turn toward {}'.format(
             self.swarmie_name,
             next_yaw
@@ -119,7 +120,7 @@ class MoveToCellAction(object):
         )
         self._current_sub_action = TurnAction(self.swarmie_name, next_yaw)
       else:
-        rospy.loginfo(
+        rospy.logdebug(
           '{} still turning to yaw {}; currently at {}'.format(
             self.swarmie_name,
             next_yaw,
@@ -129,7 +130,7 @@ class MoveToCellAction(object):
     else:
       # Forward!
       if not self._already_driving():
-        rospy.loginfo(
+        rospy.logdebug(
           '{} driving forward.'.format(
             self.swarmie_name
           )

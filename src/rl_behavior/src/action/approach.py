@@ -25,7 +25,7 @@ class ApproachAction(object):
   
   def update(self, swarmie_state, elapsed_time):
     if not self.tag_state.cube_tags:
-      rospy.loginfo(
+      rospy.logdebug(
         '{} asked to approach non-existent cube.'.format(
           self.swarmie_name
         )
@@ -38,7 +38,7 @@ class ApproachAction(object):
     cube_dist = closest_cube.tag_dist
     if not closest_cube.is_new:
       cube_dist -= swarmie_state.linear_vel * closest_cube.age.to_sec()
-    rospy.loginfo(
+    rospy.logdebug(
       '{} approaching cube at grid {}, base_link {}, {} meters off.'.format(
         self.swarmie_name,
         closest_cube.grid_coords,
@@ -55,7 +55,7 @@ class ApproachAction(object):
       vel_setpoint = min(ApproachAction.MAX_APPROACH_VEL, vel_setpoint)
       vel_setpoint = max(ApproachAction.MIN_APPROACH_VEL, vel_setpoint)
       vel_error = vel_setpoint - swarmie_state.linear_vel
-      rospy.loginfo(
+      rospy.logdebug(
         '{} velocity set point is ({}), current is ({}), making an error of ({})'.format(
           self.swarmie_name,
           vel_setpoint,
@@ -68,7 +68,7 @@ class ApproachAction(object):
         closest_cube.base_link_coords[1] / closest_cube.base_link_coords[0]
       )
       yaw_error = yaw_setpoint - yaw_current
-      rospy.loginfo(
+      rospy.logdebug(
         '{} yaw set point is ({}), current is ({}), making an error of ({})'.format(
           self.swarmie_name,
           yaw_setpoint,
@@ -80,7 +80,7 @@ class ApproachAction(object):
       # Negating the sign of the error since transverse y-axis positive
       # direction is to the left.
       yaw_output = self.yaw_pid.pid_out(-1. * yaw_error, yaw_setpoint)
-      rospy.loginfo(
+      rospy.logdebug(
         '{} PID output for velocity ({}), yaw ({})'.format(
           self.swarmie_name,
           vel_output,
@@ -97,7 +97,7 @@ class ApproachAction(object):
         skid=Skid(left=left_cmd, right=right_cmd)
       )
     else:
-      rospy.loginfo(
+      rospy.logdebug(
         '{} done with approach to cube.'.format(
           self.swarmie_name
         )

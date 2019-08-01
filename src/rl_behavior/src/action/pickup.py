@@ -24,12 +24,12 @@ class PickupAction(object):
       if next_response is not None:
         break
       else:
-        rospy.loginfo(
+        rospy.logdebug(
           'PickupAction done with {}'.format(repr(self._sub_action_sequence[0]))
         )
         del self._sub_action_sequence[0]
     if next_response is None:
-      rospy.loginfo(
+      rospy.logdebug(
         'PickupAction completely done.'
       )
     return next_response

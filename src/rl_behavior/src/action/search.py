@@ -116,7 +116,7 @@ class SearchAction(object):
       next_response = self._search_sequence[self._next_move].update(swarmie_state, elapsed_time)
       if next_response is None:
         self._next_move = (self._next_move + 1) % len(self._search_sequence)
-    rospy.loginfo('SearchAction executing {}'.format(str(self._search_sequence[self._next_move])))
+    rospy.loginfo('SearchAction of {} executing {}'.format(self.quadrant, str(self._search_sequence[self._next_move])))
     return next_response
         
 # vim: set ts=2 sw=2 expandtab:
