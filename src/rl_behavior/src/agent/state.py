@@ -180,8 +180,6 @@ class StateRepository(object):
 
   def make_state_vector(self):
     result = np.zeros(self.state_size)
-    self._reeval_block_counts()
-    self._reeval_distances()
     idx = 0
     for a_cube_cat in ['at-large', 'located', 'in-transit', 'collected', ]:
       result[idx] = float(self.cube_counts[a_cube_cat]) / float(self.cube_count)
@@ -208,6 +206,8 @@ class StateRepository(object):
           grid_y=event.swarmie_loc[1]
         )
       )
+    self._reeval_block_counts()
+    self._reeval_distances()
   
   def remote_swarmie_loc_update(self, report):
     if report.swarmie_id != self.own_swarmie_id:
@@ -231,6 +231,8 @@ class StateRepository(object):
           )
         )
     self.spotted_cubes.add(event.cube_loc)
+    self._reeval_block_counts()
+    self._reeval_distances()
 
   def remote_cube_spotted(self, report):
     if report.swarmie_id != self.own_swarmie_id:
@@ -252,6 +254,8 @@ class StateRepository(object):
           grid_y=event.cube_loc[1]
         )
       )
+    self._reeval_block_counts()
+    self._reeval_distances()
 
   def remote_cube_picked_up_by(self, report):
     if report.swarmie_id != self.own_swarmie_id:
@@ -268,6 +272,8 @@ class StateRepository(object):
       self.cube_dropped_pub.publish(
         Int16(data=self.own_swarmie_id)
       )
+    self._reeval_block_counts()
+    self._reeval_distances()
 
   def remote_cube_dropped_by(self, report):
     if report.data != self.own_swarmie_id:
@@ -284,6 +290,8 @@ class StateRepository(object):
       self.cube_collection_pub.publish(
         Int16(data=self.own_swarmie_id)
       )
+    self._reeval_block_counts()
+    self._reeval_distances()
 
   def remote_cube_collected(self, report):
     if report.data != self.own_swarmie_id:
@@ -303,6 +311,8 @@ class StateRepository(object):
         )
       )
     self.spotted_cubes.discard(event.cube_loc)
+    self._reeval_block_counts()
+    self._reeval_distances()
 
   def remote_cube_vanished(self, report):
     if report.swarmie_id != self.own_swarmie_id:

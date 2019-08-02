@@ -102,8 +102,8 @@ class Arena(object):
       self.grid_dims,
       dtype=np.bool
     )
-    # for a_swarmie_loc in self._swarmie_grid_locs[:]:
-    #   result[a_swarmie_loc[0], a_swarmie_loc[1]] = True
+    for a_swarmie_loc in self._swarmie_grid_locs[:]:
+      result[a_swarmie_loc[0], a_swarmie_loc[1]] = True
     if include_nest:
       np.logical_or(result, self._nest_mask, out=result)
     return result

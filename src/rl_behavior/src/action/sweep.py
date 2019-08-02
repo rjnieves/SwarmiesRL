@@ -42,8 +42,8 @@ class SweepAction(object):
       )
       sweep_idxs = np.mod(sweep_idxs + count_arr, count_arr)
       self._sub_action_sequence = [
-        TurnAction(self.swarmie_name, SweepAction.ORIENTATIONS[sweep_idxs[0]], min_skid=-50., max_skid=50.),
-        TurnAction(self.swarmie_name, SweepAction.ORIENTATIONS[sweep_idxs[1]], min_skid=-50., max_skid=50.),
+        TurnAction(self.swarmie_name, SweepAction.ORIENTATIONS[sweep_idxs[0]], min_skid=-30., max_skid=30.),
+        TurnAction(self.swarmie_name, SweepAction.ORIENTATIONS[sweep_idxs[1]], min_skid=-30., max_skid=30.),
         TurnAction(self.swarmie_name, SweepAction.ORIENTATIONS[orientation_idx])
       ]
     next_response = None

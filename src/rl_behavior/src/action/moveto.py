@@ -10,6 +10,10 @@ from swarmie_msgs.msg import Skid
 from utility import YawBearing, yaw_wrap
 from . import ActionResponse
 
+class CollisionImminentError(Exception):
+  def __init__(self):
+    super(CollisionImminentError, self).__init__()
+
 class MoveToCellAction(object):
   @staticmethod
   def convert_policy_move_to_yaw(policy_move):
@@ -100,8 +104,12 @@ class MoveToCellAction(object):
                 self.swarmie_name
               )
             )
+            raise CollisionImminentError
         break
       except KeyError:
+        self._plan_route(swarmie_grid_pos)
+        error_countdown -= min(error_countdown, 0)
+      except CollisionImminentError:
         self._plan_route(swarmie_grid_pos)
         error_countdown -= min(error_countdown, 0)
     rospy.logdebug(
@@ -133,7 +141,7 @@ class MoveToCellAction(object):
         )
         self._current_sub_action = TurnAction(self.swarmie_name, next_yaw)
       else:
-        rospy.logdebug(
+        rospy.loginfo(
           '{} still turning to yaw {}; currently at {}'.format(
             self.swarmie_name,
             next_yaw,

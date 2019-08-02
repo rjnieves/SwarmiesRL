@@ -11,6 +11,7 @@ from . import TurnAction, DriveAction, ActionResponse
 class MoveToRealAction(object):
   TURNING_STATE = 1
   DRIVING_STATE = 2
+  MIN_SONAR = 0.5
   def __init__(self, swarmie_name, target_dest):
     self.swarmie_name = swarmie_name
     self.target_dest = np.array(target_dest, dtype=np.float64)
@@ -57,6 +58,8 @@ class MoveToRealAction(object):
       right_cmd = self._current_action.scale_wheel_cmd(
         next_response.skid.right + yaw_output
       )
+      if np.any(swarmie_state.sonar_readings < MoveToRealAction.MIN_SONAR):
+        left_cmd = right_cmd = 0.
       next_response = ActionResponse(
         skid=Skid(left=left_cmd, right=right_cmd)
       )

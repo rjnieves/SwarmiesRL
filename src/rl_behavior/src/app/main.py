@@ -9,9 +9,9 @@ import rospy
 import message_filters
 import tf
 from tf import TransformListener
-from tf.transformations import euler_from_quaternion
+from tf.transformations import euler_from_quaternion, quaternion_from_euler
 from std_msgs.msg import String, UInt8, Float32
-from geometry_msgs.msg import Pose2D
+from geometry_msgs.msg import Pose2D, PoseStamped
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import Range, Joy
 from apriltags_ros.msg import AprilTagDetectionArray
@@ -78,6 +78,7 @@ class RlBehavior(object):
     SEARCH_ACTION: 'SEARCH',
     FETCH_ACTION: 'FETCH'
   }
+  ODOM_DRIFT_TOLERANCE = 0.5
 
   def __init__(self, swarmie_name, app_root_dir):
     self.swarmie_name = swarmie_name
@@ -118,6 +119,8 @@ class RlBehavior(object):
     self.tag_state = None
     self._latest_tag_list = None
     self._current_action = None
+    self._map_center = None
+    self._map_current = None
     # Publishers ---------------------------------------------------------------
     self.status_pub = None
     self.hb_pub = None
@@ -130,7 +133,7 @@ class RlBehavior(object):
     self.timestep_timer = None
     self.hb_timer = None
     # Subscribers --------------------------------------------------------------
-    # self.map_sub = None
+    self.map_sub = None
     self.odom_sub = None
     self.mode_sub = None
     self.sonar_left_sub = None
@@ -194,12 +197,12 @@ class RlBehavior(object):
     # --------------------------------------------------------------------------
     # Set up all the subscribers
     #
-    # self.map_sub = rospy.Subscriber(
-    #   '{}/odom/ekf'.format(self.swarmie_name),
-    #   Odometry,
-    #   callback=self._on_map_update,
-    #   queue_size=10
-    # )
+    self.map_sub = rospy.Subscriber(
+      '{}/odom/ekf'.format(self.swarmie_name),
+      Odometry,
+      callback=self._on_map_update,
+      queue_size=10
+    )
     self.odom_sub = rospy.Subscriber(
       '{}/odom/filtered'.format(self.swarmie_name),
       Odometry,
@@ -292,7 +295,6 @@ class RlBehavior(object):
     :param event:
     :type event: rospy.timer.TimerEvent
     """
-    timestep_step = ''
     time_since_last_step = None
     if event.last_real is not None:
       time_since_last_step = (rospy.Time.now() - event.last_real)
@@ -300,7 +302,6 @@ class RlBehavior(object):
       # ------------------------------------------------------------------------
       # Initial timestep
       if not self.initialized:
-        timestep_step = 'Initial Setup'
         self.infolog_pub.publish(
           String(
             data='{} willing to learn!'.format(self.swarmie_name)
@@ -313,6 +314,11 @@ class RlBehavior(object):
             self.swarmie_state.odom_center[0],
             self.swarmie_state.odom_center[1]
           )
+        )
+        self._map_center = (
+          self._map_current[0] + (RlBehavior.INIT_PLACE_RADIUS * math.cos(self._map_current[2])),
+          self._map_current[1] + (RlBehavior.INIT_PLACE_RADIUS * math.sin(self._map_current[2])),
+          self._map_current[2]
         )
         if not self.initialized:
           rospy.logfatal(
@@ -332,8 +338,12 @@ class RlBehavior(object):
             )
           )
       # ------------------------------------------------------------------------
+      # Evaluate and mitigate any Odometry drift
+      # timestep_step = 'Evaluating Odometry'
+      # self._evaluate_odom_drift()
+
+      # ------------------------------------------------------------------------
       # Update tag information with latest message
-      timestep_step = 'Tag Sightings Update'
       if self._latest_tag_list is not None:
         self.tag_state.update(self._latest_tag_list).sort()
       for a_tag_report in self.tag_state.cube_tags:
@@ -347,7 +357,6 @@ class RlBehavior(object):
         )
       # ------------------------------------------------------------------------
       # Automatically select an action if in automatic mode
-      timestep_step = 'Automatic Action Selection'
       if self.mode == RlBehavior.AUTONOMOUS_MODE:
         state_vector = self.rl_state_rep.make_state_vector()
         rl_action_id = self.rl_agent.act(state_vector)
@@ -373,20 +382,20 @@ class RlBehavior(object):
           else:
             self._current_action = None
         elif rl_action_id == RlBehavior.FETCH_ACTION and not isinstance(self._current_action, FetchAction):
-          if self._current_action is None:
-            nearest_cube = self.rl_state_rep.nearest_cube[self.swarmie_id]
-            if nearest_cube is not None:
-              self._current_action = FetchAction(
-                self.swarmie_name,
-                self.arena,
-                nearest_cube,
-                self.tag_state
-              )
-          else:
-            self._current_action = None
+            if self._current_action is None and self.rl_state_rep.nearest_cube[self.swarmie_id] is not None:
+              nearest_cube = self.rl_state_rep.nearest_cube[self.swarmie_id]
+              if nearest_cube is not None:
+                self._current_action = FetchAction(
+                  self.swarmie_name,
+                  self.swarmie_id,
+                  self.arena,
+                  self.rl_state_rep,
+                  self.tag_state
+                )
+            else:
+              self._current_action = None
       # ------------------------------------------------------------------------
       # Execute current action, should there be one.
-      timestep_step = 'Action Execution'
       action_response = None
       if self._current_action is not None:
         action_response = self._current_action.update(
@@ -405,25 +414,62 @@ class RlBehavior(object):
         self.drive_cmd_pub.publish(Skid(left=0., right=0.))
       # ------------------------------------------------------------------------
       # Age the april tag sightings based on elapsed time
-      timestep_step = 'April Tag Sighting Age'
       if time_since_last_step is not None:
         self.tag_state.dock_age(time_since_last_step)
-    except Exception as ex:
-      ex_info = sys.exc_info()
-      file_name = '<unknown>'
-      line_num = '<unknown>'
-      func_name = '<unknown>'
-      if len(ex_info) > 2 and ex_info[2] is not None:
-        tb_info = traceback.extract_tb(ex_info[2], 1)
-        if len(tb_info) > 0 and len(tb_info[0]) > 3:
-          (file_name, line_num, func_name, _) = tb_info[0]
+    except Exception:
+      # ex_info = sys.exc_info()
+      # file_name = '<unknown>'
+      # line_num = '<unknown>'
+      # func_name = '<unknown>'
+      # if len(ex_info) > 2 and ex_info[2] is not None:
+      #   tb_info = traceback.extract_tb(ex_info[2], 1)
+      #   if len(tb_info) > 0 and len(tb_info[0]) > 3:
+      #     (file_name, line_num, func_name, _) = tb_info[0]
       rospy.logwarn(
-        'Exception raised during {} at file {} function {} line {}: {}'.format(
-          timestep_step,
-          file_name,
-          func_name,
-          line_num,
-          ex.message
+        '{}'.format(
+          traceback.format_exc()
+        )
+      )
+
+  def _evaluate_odom_drift(self):
+    map_pose = PoseStamped()
+    map_pose.header.stamp = rospy.Time.now()
+    map_pose.header.frame_id = '{}/map'.format(self.swarmie_name)
+    (
+      map_pose.pose.orientation.x,
+      map_pose.pose.orientation.y,
+      map_pose.pose.orientation.z,
+      map_pose.pose.orientation.w
+    ) = quaternion_from_euler(0., 0., self._map_center[2])
+    map_pose.pose.position.x = self._map_center[0]
+    map_pose.pose.position.y = self._map_center[1]
+    odom_pose = None
+    try:
+      self.tf.waitForTransform(map_pose.header.frame_id, '{}/odom'.format(self.swarmie_name), map_pose.header.stamp, rospy.Duration(1))
+      odom_pose = self.tf.transformPose('{}/odom'.format(self.swarmie_name), map_pose)
+    except tf.Exception as ex:
+      rospy.logwarn(
+        'Unable to evaluate odometry drift: {}'.format(ex.message)
+      )
+      return
+    x_diff = odom_pose.pose.position.x - self.swarmie_state.odom_center[0]
+    y_diff = odom_pose.pose.position.y - self.swarmie_state.odom_center[1]
+    total_diff = math.hypot(x_diff, y_diff)
+    rospy.loginfo(
+      'Odometry drift appears to be {}'.format(total_diff)
+    )
+    if total_diff > RlBehavior.ODOM_DRIFT_TOLERANCE:
+      new_center = np.array(
+        [
+          self.swarmie_state.odom_center[0] + (x_diff / total_diff),
+          self.swarmie_state.odom_center[1] + (y_diff / total_diff)
+        ]
+      )
+      rospy.logwarn(
+        'Odometry drift out of tolerance by {}. Adjust odom_center from {} to {}'.format(
+          total_diff,
+          self.swarmie_state.odom_center[0:2],
+          new_center
         )
       )
 
@@ -454,6 +500,23 @@ class RlBehavior(object):
     )
     self.swarmie_state.linear_vel = sample.twist.twist.linear.x
     self.swarmie_state.angular_vel = sample.twist.twist.angular.z
+
+  def _on_map_update(self, sample):
+    (_, _, yaw) = euler_from_quaternion(
+      (
+        sample.pose.pose.orientation.x,
+        sample.pose.pose.orientation.y,
+        sample.pose.pose.orientation.z,
+        sample.pose.pose.orientation.w
+      )
+    )
+    self._map_current = np.array(
+      [
+        sample.pose.pose.position.x,
+        sample.pose.pose.position.y,
+        yaw
+      ]
+    )
 
   def _on_mode_change(self, sample):
     """Operating mode update callback.
@@ -504,6 +567,7 @@ class RlBehavior(object):
         right_sample.range
       )
     )
+    self.swarmie_state.sonar_readings = np.array([left_sample.range, center_sample.range, right_sample.range])
 
   def _on_joy_cmd(self, cmd):
     """Joystick command callback.
@@ -601,13 +665,13 @@ class RlBehavior(object):
       parsed_cmd = re.search(r'search\((?P<quad>[a-z]+)\)', cmd_str)
       quad = parsed_cmd.group('quad')
       self._current_action = SearchAction(self.swarmie_name, self.arena, quad)
-    elif cmd_str.startswith('fetch'):
-      parsed_cmd = re.search(r'fetch\((?P<row>[0-9]+),(?P<col>[0-9]+)\)', cmd_str)
-      dest_coords = (
-        int(parsed_cmd.group('row')),
-        int(parsed_cmd.group('col')),
-      )
-      self._current_action = FetchAction(self.swarmie_name, self.arena, dest_coords, self.tag_state)
+    # elif cmd_str.startswith('fetch'):
+    #   parsed_cmd = re.search(r'fetch\((?P<row>[0-9]+),(?P<col>[0-9]+)\)', cmd_str)
+    #   dest_coords = (
+    #     int(parsed_cmd.group('row')),
+    #     int(parsed_cmd.group('col')),
+    #   )
+    #   self._current_action = FetchAction(self.swarmie_name, self.arena, dest_coords, self.tag_state)
     elif cmd_str == 'nest':
       self._current_action = MoveToRealAction(self.swarmie_name, (0.0, 0.0))
     elif cmd_str == 'halt':

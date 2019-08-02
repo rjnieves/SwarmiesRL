@@ -2,6 +2,7 @@
 """
 
 import math
+import numpy as np
 import rospy
 from swarmie_msgs.msg import Skid
 from utility import PidLoop
@@ -12,8 +13,9 @@ class ApproachAction(object):
   DIST_TO_VEL_KP = 0.2 # kP for simple distance to velocity P-loop
   MAX_APPROACH_VEL = 0.2 # meters/s
   MIN_APPROACH_VEL = 0.1 # meters/s
-  MIN_SKID_CMD = -180.
-  MAX_SKID_CMD = 180.
+  MIN_SKID_CMD = -120.
+  MAX_SKID_CMD = 120.
+  MIN_SONAR = 0.5
 
   def __init__(self, swarmie_name, tag_state):
     super(ApproachAction, self).__init__()
@@ -93,6 +95,8 @@ class ApproachAction(object):
       right_cmd = vel_output + yaw_output
       right_cmd = min(ApproachAction.MAX_SKID_CMD, right_cmd)
       right_cmd = max(ApproachAction.MIN_SKID_CMD, right_cmd)
+      if np.any(swarmie_state.sonar_readings < ApproachAction.MIN_SONAR):
+        left_cmd = right_cmd = 0.
       return ActionResponse(
         skid=Skid(left=left_cmd, right=right_cmd)
       )

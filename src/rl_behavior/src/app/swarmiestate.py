@@ -8,6 +8,9 @@ from events import CubePickedUpEvent, CubeCollectedEvent, SwarmieLocEvent, CubeV
 class SwarmieState(object):
   CENTER_IDX = 0
   CURRENT_IDX = 1
+  LEFT_SONAR_IDX = 0
+  CENTER_SONAR_IDX = 1
+  RIGHT_SONAR_IDX = 2
   def __init__(self, swarmie_name, swarmie_id, coord_xform, emitter):
     super(SwarmieState, self).__init__()
     self.swarmie_name = swarmie_name
@@ -16,6 +19,7 @@ class SwarmieState(object):
     self.emitter = emitter
     self.linear_vel = None
     self.angular_vel = None
+    self.sonar_readings = np.array([5.] * 3)
     self._position_storage = np.zeros([2, 3])
     self._positions_populated = np.zeros([2, 3], dtype=np.bool)
 
