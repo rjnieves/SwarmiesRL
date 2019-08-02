@@ -14,6 +14,11 @@ from keras import backend as K
 import rospy
 from .base import BaseAgent
 
+# ------------------------------------------------------------------------------
+# CODE ATTRIBUTION NOTICE:
+# The DqnAgent class code is primarily based on the Double DQN example code
+# available on GitHub at:
+# https://github.com/keon/deep-q-learning
 class DqnAgent(BaseAgent):
   def __init__(self, policy, state_size, action_size, model_file_path, minibatch_size=32):
     super(DqnAgent, self).__init__(policy, state_size, action_size)
@@ -88,5 +93,7 @@ class DqnAgent(BaseAgent):
       self.model.fit(faux_batch, target, epochs=1, verbose=0)
     self.model.save_weights(self.model_file_path)
     self.policy.post_train_action()
+# END CODE ATTRIBUTION NOTICE
+# ------------------------------------------------------------------------------
 
 # vim: set ts=2 sw=2 expandtab:

@@ -37,6 +37,11 @@ class PathPlanning(object):
     self._heap_storage = []
     self._planning_grid = np.array([], dtype=np.bool)
 
+# ------------------------------------------------------------------------------
+# CODE ATTRIBUTION NOTICE:
+# The actual A* search code in the PathPlanning._path_search() method is
+# primarily based off the work done by me (Mr. Rolando J. Nieves) on assignments
+# for the Advanced Artificial Intelligence (CAP 5636) class.
   def _path_search(self, from_matrix_pos, to_matrix_pos):
     path = []
     visited = set()
@@ -82,7 +87,9 @@ class PathPlanning(object):
     path.insert(0, (path_action, path_position))
     
     return path
-  
+# END CODE ATTRIBUTION NOTICE
+# ------------------------------------------------------------------------------
+
   def _find_legal_moves(self, at_matrix_pos):
     result = []
     if len(self._planning_grid) == 0:

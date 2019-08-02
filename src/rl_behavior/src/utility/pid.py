@@ -5,6 +5,11 @@ import sys
 import math
 import numpy as np
 
+# ------------------------------------------------------------------------------
+# CODE ATTRIBUTION NOTICE
+# The code for the PidLoop class is a near-direct port of the C++ code that
+# implements a PID loop as offered in the ROS "behaviours" package in this
+# workspace.
 class PidLoop(object):
   class Config(object):
     def __init__(self, **kwargs):
@@ -128,6 +133,8 @@ class PidLoop(object):
   def _reset_integral(self):
     self._integral_error_hist_array = [0.,] * self.config.integral_error_history_length
     self._step = 0
+# END CODE ATTRIBUTION NOTICE
+# ------------------------------------------------------------------------------
 
 if __name__ == '__main__':
   slow_vel_pid_config = PidLoop.Config()
