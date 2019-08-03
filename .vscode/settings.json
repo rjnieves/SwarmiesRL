@@ -50,20 +50,24 @@
     "/dev/null"
   ],
   "cSpell.words": [
+    "ANNs",
+    "Kalman",
+    "Robo",
+    "SARSA",
     "Swarmathon",
     "Swarmie",
-    "Robo",
-    "swarmies",
-    "Kalman",
-    "waypoint",
-    "waypoints",
+    "Swarmie's",
+    "deconflicting",
     "discretization",
     "discretized",
     "fetchable",
+    "hyperparameters",
+    "odometry",
     "stateful",
     "subcomponent",
-    "SARSA",
-    "ANNs"
+    "swarmies",
+    "waypoint",
+    "waypoints"
   ],
   "cmake.configureOnOpen": false,
   "clangd.arguments": [
